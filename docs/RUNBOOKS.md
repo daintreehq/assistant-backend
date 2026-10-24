@@ -53,8 +53,9 @@ maintainers wrote the traps into it.
   `host.call` (direct control of a Remote Host) and `assistant.list`/`assistant.start`.
 - `relayed-core` / `relayed-full`: what a Remote Host offers inside `host.call`, at the
   calling assistant's Tool set: the owned terminal tools, agents, worktrees,
-  `assistant.*`, and at Full the checks and the command runner (`project.runCheck`,
-  `project.runCommand`). Never a `host.*` tool: calls do not chain.
+  `assistant.*` and the command runner (`project.runCommand`, admitted by caller at
+  either tier), and at Full the checks (`project.runCheck`). Never a `host.*` tool:
+  calls do not chain.
 - `external`: an API-key client. It gets a curated subset, and **no `notify`** on
   `agent.launch` or the send, and no `terminal.notifyWhenIdle`.
 

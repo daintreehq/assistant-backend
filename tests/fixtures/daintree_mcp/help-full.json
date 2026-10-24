@@ -2,8 +2,8 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "1006cbca719950c122d995c7b378138a3968aaa2",
-    "app_version": "0.45.0",
+    "app_commit": "1752ef90a46df6152f95a0befde2dca46491e44c",
+    "app_version": "0.46.0",
     "caller_origin": "help",
     "session_origin": "help",
     "tier": "full",
@@ -13,7 +13,7 @@
       "renderer_owned_origin": true,
       "relay": false
     },
-    "caller": "The same sidebar help session with Tool set = Full: adds project.runCommand, and the Full-only window moves host.switch and project.openOnHost, listed because the Shell has added a host.",
+    "caller": "The same sidebar help session with Tool set = Full: the Full tier allowlist adds project.runCheck, terminal.new and the rest, and the Full-only window moves host.switch and project.openOnHost, listed because the Shell has added a host.",
     "host_control": {
       "help_session": true,
       "call_reachable": true,
@@ -26,12 +26,12 @@
       "added_remote_hosts": true,
       "manifest_source": "view"
     },
-    "captured_at": "2026-10-21",
+    "captured_at": "2026-10-24",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "93d756c0eecc58575b312e64f8b6006cbbc31663e0b6c68ad74bbd436986b5bc",
+    "surface_hash": "2f9f2157e1534b4aa6bcc445ee72bbba56595fb23e0883861fe13fbdebfa2581",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest and session policy)",
-    "tool_count": 91,
+    "tool_count": 93,
     "context_gated_tools": [
       "host.switch",
       "project.openOnHost"
@@ -55,11 +55,13 @@
           "manifest_source": "view"
         },
         "tool_count": 89,
-        "surface_hash": "259e9c294cb5473adb18b30a49f6055d49ee499247d2baf347f47a9301f7406e",
+        "surface_hash": "b3eb064f7761d70ddfb4da1f3f4f2fe445f79044f9b894d278912d72bd7b81dc",
         "added": [],
         "removed": [
           "host.call",
-          "host.list"
+          "host.ensureProject",
+          "host.list",
+          "host.settings"
         ],
         "changed": []
       },
@@ -77,12 +79,11 @@
           "added_remote_hosts": true,
           "manifest_source": "viewless-help"
         },
-        "tool_count": 49,
-        "surface_hash": "4cdd99427ef570f600982813ff11a9608f435fba0a7a0259ff9a211ce3d30876",
+        "tool_count": 51,
+        "surface_hash": "baf5980b97f1e1fb8d635da5ab5c3c0da17a2a94b8d5bef86b56fe1654f019e9",
         "added": [],
         "removed": [
           "agent.launchMany",
-          "agent.listModels",
           "agentSessionHistory.list",
           "agentSessionHistory.resume",
           "browser.getConsoleMessages",
@@ -95,7 +96,9 @@
           "git.getProjectPulse",
           "help.displayImage",
           "host.call",
+          "host.ensureProject",
           "host.list",
+          "host.settings",
           "host.switch",
           "notifications.recent",
           "plugin.capturePanel",
@@ -104,7 +107,6 @@
           "plugin.reloadProject",
           "plugin.validate",
           "project.openOnHost",
-          "slashCommands.list",
           "terminal.closeAll",
           "terminal.closeMany",
           "terminal.inject",
@@ -509,14 +511,15 @@
                   "panel-limit",
                   "already-launching",
                   "spawn-failed",
-                  "unavailable"
+                  "unavailable",
+                  "host-memory"
                 ]
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Null on a launch, else why not: panel-limit (see panelLimit), already-launching (retry), missing-cli (setup panel opened)."
+            "description": "Null if launched. panel-limit: see panelLimit; already-launching, host-memory: retry; missing-cli: setup opened."
           },
           "worktreeId": {
             "type": [
@@ -3689,7 +3692,7 @@
     {
       "action_id": "host.call",
       "wire_name": "host.call",
-      "description": "Run one of a host's own Daintree tools in one of its projects and get its result, such as starting the host's assistant or sending it a prompt. Changes are refused while another machine drives that project. ambiguous: resend under its callId, which never runs twice.",
+      "description": "Run a host's own Daintree tool in one of its projects (local reaches another project here) and get its result, such as starting its assistant. Changes are refused while another machine drives that project. ambiguous: resend under its callId, which never runs twice.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3715,6 +3718,10 @@
           },
           "callId": {
             "description": "Resend an ambiguous call under its callId. It never runs twice.",
+            "type": "string"
+          },
+          "newCallId": {
+            "description": "Your own fresh UUID for a write; with no answer back, resend under it as callId. Never both.",
             "type": "string"
           }
         },
@@ -3831,12 +3838,347 @@
       }
     },
     {
-      "action_id": "host.list",
-      "wire_name": "host.list",
-      "description": "List the hosts this machine's assistant may reach, as observed: connection, last load sample, agent counts, and each connected host's projects, which a call there names. Null means not measured.",
+      "action_id": "host.ensureProject",
+      "wire_name": "host.ensureProject",
+      "description": "Make sure this project is on a host: its copy found, else cloned there, plus the branch's worktree when asked. Returns the host's projectId to run its tools in. Never pushes, opens a window or runs setup; choices for the person come back as questions. working: call again the same way.",
       "inputSchema": {
         "type": "object",
-        "properties": {},
+        "properties": {
+          "hostId": {
+            "type": "string",
+            "description": "A host id from the host list."
+          },
+          "worktree": {
+            "description": "Also make the branch's worktree there, at the remote's commit.",
+            "type": "boolean"
+          },
+          "worktreePath": {
+            "description": "Which of this project's worktrees has the branch. Default: the project folder.",
+            "type": "string"
+          },
+          "copy": {
+            "description": "The person's answer to a copies question: a path it named, or \"new\" to clone.",
+            "type": "string"
+          },
+          "accept": {
+            "description": "Questions the person agreed to go past, up to 2.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "unpushed",
+                "lfs_missing"
+              ]
+            }
+          }
+        },
+        "required": [
+          "hostId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ambiguous",
+              "opted_out",
+              "disconnected",
+              "unsupported",
+              "policy_rejected",
+              "expired",
+              "not_found",
+              "rate_limited",
+              "too_large",
+              "conflict"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryAfterMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "hostId": {
+            "type": "string"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "const": "ready"
+                      },
+                      "project": {
+                        "type": "object",
+                        "properties": {
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "worktreePath": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "how": {
+                            "type": "string",
+                            "enum": [
+                              "existing",
+                              "registered",
+                              "cloned"
+                            ]
+                          },
+                          "leftHere": {
+                            "type": "object",
+                            "properties": {
+                              "uncommittedChanges": {
+                                "type": "number"
+                              },
+                              "unpushedCommits": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "uncommittedChanges",
+                              "unpushedCommits"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "setupRecipes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "note": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "projectId",
+                          "name",
+                          "path",
+                          "worktreePath",
+                          "how",
+                          "leftHere",
+                          "setupRecipes",
+                          "note"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "project"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "const": "question"
+                      },
+                      "questions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "reason": {
+                              "type": "string",
+                              "enum": [
+                                "unpushed",
+                                "branch_not_on_remote",
+                                "detached",
+                                "remote_unreachable",
+                                "lfs_missing",
+                                "no_remote",
+                                "multiple_copies",
+                                "committed_id_only",
+                                "destination_taken",
+                                "driven_elsewhere",
+                                "branch_not_placed"
+                              ]
+                            },
+                            "detail": {
+                              "type": "string"
+                            },
+                            "accept": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "unpushed",
+                                    "lfs_missing"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "copies": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "path": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "registered": {
+                                        "type": "boolean"
+                                      },
+                                      "matchedBy": {
+                                        "type": "string",
+                                        "enum": [
+                                          "remote-url",
+                                          "committed-id"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "path",
+                                      "name",
+                                      "registered",
+                                      "matchedBy"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "reason",
+                            "detail",
+                            "accept",
+                            "copies"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "questions"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "const": "working"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "const": "failed"
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "note"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "outcome",
+          "detail",
+          "retryAfterMs",
+          "hostId",
+          "answer"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Bring this project to a host",
+        "readOnlyHint": false,
+        "idempotentHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "host.list",
+      "wire_name": "host.list",
+      "description": "List the hosts this assistant reaches, this machine first as local, as observed: connection, load sample, agent counts and each connected host's projects, which calls name. Null means unmeasured.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includeAgents": {
+            "description": "Also list each host's agents: its workers and Daintree Assistants, as observed. Read the coverage before reading an empty list as nothing running.",
+            "type": "boolean"
+          },
+          "projectId": {
+            "description": "With includeAgents, list only the agents of this project (a projectId from the list).",
+            "type": "string"
+          }
+        },
         "additionalProperties": false
       },
       "outputSchema": {
@@ -3882,11 +4224,67 @@
                         "sampledAt": {
                           "type": "number"
                         },
+                        "ageMs": {
+                          "type": "number"
+                        },
+                        "stale": {
+                          "type": "boolean",
+                          "description": "Too old to trust: the live figures below are null. Not a zero reading."
+                        },
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "darwin",
+                            "linux"
+                          ]
+                        },
                         "cpuPercent": {
                           "type": [
                             "number",
                             "null"
                           ]
+                        },
+                        "cpuLogicalCores": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "cpuBusyCores": {
+                          "description": "cpuPercent of the cores it is a share of: all logical cores, or a cgroup quota.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "cpuIdleCores": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryTotalBytes": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryUsedBytes": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryAvailableBytes": {
+                          "description": "Total minus used, as the host counts.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryCapacityReported": {
+                          "type": "boolean",
+                          "description": "False: an older host whose used memory includes file cache, so none is given."
                         },
                         "memoryPressure": {
                           "anyOf": [
@@ -3918,11 +4316,53 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "metricsScope": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "host",
+                                "cgroup"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "memoryPressureSomeAvg10": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "temperatureCelsius": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "temperatureZone": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
                         "sampledAt",
+                        "ageMs",
+                        "stale",
+                        "platform",
                         "cpuPercent",
+                        "cpuLogicalCores",
+                        "cpuBusyCores",
+                        "cpuIdleCores",
+                        "memoryTotalBytes",
+                        "memoryUsedBytes",
+                        "memoryAvailableBytes",
+                        "memoryCapacityReported",
                         "memoryPressure",
                         "thermal"
                       ],
@@ -3931,7 +4371,8 @@
                     {
                       "type": "null"
                     }
-                  ]
+                  ],
+                  "description": "Null: no sample. Any null field inside is unknown, never zero or unlimited."
                 },
                 "agentsObserved": {
                   "anyOf": [
@@ -3972,11 +4413,19 @@
                           },
                           "name": {
                             "type": "string"
+                          },
+                          "frontendAttached": {
+                            "description": "A frontend is attached: a view there or a driving Shell. If false, only tools the host runs itself run. Null: unknown.",
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
                           "projectId",
-                          "name"
+                          "name",
+                          "frontendAttached"
                         ],
                         "additionalProperties": false
                       }
@@ -3988,6 +4437,364 @@
                 },
                 "control": {
                   "type": "boolean"
+                },
+                "agents": {
+                  "type": "object",
+                  "properties": {
+                    "coverage": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "stale",
+                        "unreachable",
+                        "unsupported"
+                      ]
+                    },
+                    "observedAt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "complete": {
+                      "type": "boolean"
+                    },
+                    "omitted": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "const": "live"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "worker",
+                                  "assistant"
+                                ]
+                              },
+                              "subject": {
+                                "type": "object",
+                                "properties": {
+                                  "hostId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "scope": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "project"
+                                          },
+                                          "projectId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 256
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "projectId"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "global"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "terminalId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  },
+                                  "incarnation": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "lane": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 2
+                                  }
+                                },
+                                "required": [
+                                  "hostId",
+                                  "scope",
+                                  "terminalId",
+                                  "incarnation"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "agentId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "agentState": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "idle",
+                                      "working",
+                                      "waiting",
+                                      "directing",
+                                      "completed",
+                                      "exited"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "waitingReason": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "prompt",
+                                      "question",
+                                      "approval",
+                                      "error"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "since": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "attached": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "handback": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "observedAt": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "observedAt"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "confirmations": {
+                                "type": "object",
+                                "properties": {
+                                  "waiting": {
+                                    "maxItems": 4,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "actionId": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "since": {
+                                          "type": "number"
+                                        },
+                                        "expiresAt": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "actionId",
+                                        "since",
+                                        "expiresAt"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "omitted": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "waiting",
+                                  "omitted"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "notices": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "pending": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "ready": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "delivery": {
+                                        "type": "string",
+                                        "enum": [
+                                          "idle",
+                                          "scheduled",
+                                          "held",
+                                          "blocked",
+                                          "outstanding",
+                                          "failed"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "pending",
+                                      "ready",
+                                      "delivery"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "role",
+                              "subject",
+                              "agentId",
+                              "agentState",
+                              "waitingReason",
+                              "since",
+                              "label",
+                              "attached",
+                              "handback"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "const": "resumable"
+                              },
+                              "role": {
+                                "type": "string",
+                                "const": "assistant"
+                              },
+                              "hostId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "scope": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "project"
+                                  },
+                                  "projectId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "projectId"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "lane": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2
+                              },
+                              "agentId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "capturedAt": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "role",
+                              "hostId",
+                              "scope",
+                              "lane",
+                              "agentId",
+                              "capturedAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "coverage",
+                    "observedAt",
+                    "complete",
+                    "omitted",
+                    "entries"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "required": [
@@ -4019,6 +4826,242 @@
       },
       "daintree": {
         "kind": "query",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "host.settings",
+      "wire_name": "host.settings",
+      "description": "Read or change named settings on hosts, such as turning Canopy on across several. preview returns a ticket and changes nothing; apply asks the person to approve exactly that preview, then writes it. Never this machine's own settings.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "read",
+              "preview",
+              "apply"
+            ],
+            "description": "read: current values. preview: what patch would change, and a ticket. apply: run it."
+          },
+          "hostIds": {
+            "description": "For read and preview: the exact hosts, up to 8.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A host id from the host list."
+            }
+          },
+          "keys": {
+            "description": "For read: which settings, up to 5. Default: all.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "canopyMode",
+                "agentDefaults.defaultAgent",
+                "agentDefaults.assistantAgentId",
+                "idleTerminalNotify.enabled",
+                "idleTerminalNotify.thresholdMinutes"
+              ]
+            }
+          },
+          "patch": {
+            "description": "For preview: values to set on every host named.",
+            "type": "object",
+            "properties": {
+              "canopyMode": {
+                "type": "string",
+                "enum": [
+                  "unset",
+                  "on",
+                  "hidden"
+                ]
+              },
+              "agentDefaults.defaultAgent": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agentDefaults.assistantAgentId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "idleTerminalNotify.enabled": {
+                "type": "boolean"
+              },
+              "idleTerminalNotify.thresholdMinutes": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          },
+          "ticket": {
+            "description": "For apply: a preview's ticket. The person approves it in a dialog here first.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ambiguous",
+              "opted_out",
+              "disconnected",
+              "unsupported",
+              "policy_rejected",
+              "expired",
+              "not_found",
+              "rate_limited",
+              "too_large",
+              "conflict"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryAfterMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ticket": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hosts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hostId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "ambiguous",
+                    "opted_out",
+                    "disconnected",
+                    "unsupported",
+                    "policy_rejected",
+                    "expired",
+                    "not_found",
+                    "rate_limited",
+                    "too_large",
+                    "conflict"
+                  ]
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "settings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "enum": [
+                          "canopyMode",
+                          "agentDefaults.defaultAgent",
+                          "agentDefaults.assistantAgentId",
+                          "idleTerminalNotify.enabled",
+                          "idleTerminalNotify.thresholdMinutes"
+                        ]
+                      },
+                      "value": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      },
+                      "proposed": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "hostId",
+                "name",
+                "outcome",
+                "detail",
+                "settings"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "outcome",
+          "detail",
+          "retryAfterMs",
+          "ticket",
+          "hosts"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Change a host's settings",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
         "category": "help",
         "danger": "safe",
         "band": "reversible",
@@ -5018,7 +6061,7 @@
         "category": "project",
         "danger": "safe",
         "band": "reversible",
-        "surface_tier": "full",
+        "surface_tier": "core",
         "reach": "caller"
       }
     },
@@ -5234,7 +6277,7 @@
     {
       "action_id": "slashCommands.list",
       "wire_name": "slashCommands.list",
-      "description": "List the slash commands an agent CLI offers, including project-local ones, before driving the agent with one. An empty list means it has none; a project that is not open fails.",
+      "description": "List the slash commands an agent CLI offers, including project-local ones, before driving the agent with one. An empty list means it has none.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5600,7 +6643,7 @@
                   "type": "number"
                 },
                 "lastTypedInputAt": {
-                  "description": "Epoch ms of the last raw PTY input (keys, paste, broadcast; not sends). Before `lastTransitionAt` means none since. Not proof of delivery or authorship.",
+                  "description": "Epoch ms of last PTY input (keys, paste, broadcast, withdrawn sends). Before `lastTransitionAt` means none since. Not proof of delivery or authorship.",
                   "type": "number"
                 },
                 "exitCode": {
@@ -6049,6 +7092,46 @@
                       "type": "null"
                     }
                   ]
+                },
+                "restored": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "number"
+                    },
+                    "disposition": {
+                      "type": "string",
+                      "enum": [
+                        "resume",
+                        "fresh",
+                        "held"
+                      ]
+                    },
+                    "heldReason": {
+                      "type": "string"
+                    },
+                    "lastSeen": {
+                      "type": "object",
+                      "properties": {
+                        "agentState": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "agentState"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "at",
+                    "disposition"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Set when restore rebuilt the pane (`at`, epoch ms). lastSeen: agent state saved before then, not proof a run ended."
                 }
               },
               "required": [
@@ -7624,6 +8707,13 @@
                 },
                 "hasLiveView": {
                   "type": "boolean"
+                },
+                "frontendAttached": {
+                  "description": "A frontend is attached: a view here or a driving Shell. If false, only tools the host runs itself run. Null: unknown.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -7631,7 +8721,8 @@
                 "path",
                 "name",
                 "kind",
-                "hasLiveView"
+                "hasLiveView",
+                "frontendAttached"
               ],
               "additionalProperties": false
             }
@@ -8070,6 +9161,9 @@
                       "type": "string"
                     },
                     "additionalProperties": {}
+                  },
+                  "ssh": {
+                    "type": "string"
                   },
                   "provider": {
                     "type": "string"
@@ -8555,6 +9649,36 @@
               "additionalProperties": false
             }
           },
+          "pluginChecks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "warning",
+                    "info"
+                  ]
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pluginId",
+                "label",
+                "severity"
+              ],
+              "additionalProperties": false
+            }
+          },
           "counts": {
             "type": "object",
             "properties": {
@@ -8684,6 +9808,7 @@
           "warnings",
           "infos",
           "nextActions",
+          "pluginChecks",
           "counts",
           "aheadCount",
           "behindCount",
@@ -8942,7 +10067,7 @@
     {
       "action_id": "worktree.waitUntilReady",
       "wire_name": "worktree.waitUntilReady",
-      "description": "Wait for a worktree's post-create setup (config copy, submodules, setup script, provisioning) and report where it got. Setup can outlive creation, so work started earlier may see an unpopulated tree. A zero timeout reads without blocking; running out of time is not a failure.",
+      "description": "Wait for a worktree's post-create setup (config copy, submodules, setup script, provisioning, plugin steps) and report where it got. Setup can outlive creation, so earlier work may see an unpopulated tree. A zero timeout reads without blocking; timing out is not a failure.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8979,7 +10104,7 @@
               "needs-approval",
               "unknown"
             ],
-            "description": "pending, running (config copy, submodules, setup script or provisioning), ready, failed, timed-out, needs-approval (repo setup commands await the user's approval; you can't give it), or unknown (not created by this host, or it restarted since)."
+            "description": "pending, running (config copy, submodules, setup script, provisioning, plugin steps), ready, failed, timed-out, needs-approval (awaits the user's approval; you can't give it), or unknown (not created by this host, or it restarted since)."
           },
           "stage": {
             "anyOf": [
@@ -8988,7 +10113,8 @@
                 "enum": [
                   "copy-config",
                   "submodules",
-                  "setup-script"
+                  "setup-script",
+                  "plugin-steps"
                 ]
               },
               {

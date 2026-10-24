@@ -7,20 +7,22 @@ captured from the app itself rather than written by hand. All current runbooks
 (`runbooks/catalog/`) are checked against these captures. Retired v0.44 surfaces
 are historical material in `archive/inbox-v0.44/surfaces/`.
 
-**Source:** `daintreehq/daintree` commit `1006cbca719950c122d995c7b378138a3968aaa2`,
-`develop`, app 0.45.0. Captured 2026-10-21. This includes direct host control,
-assistant messaging through agent terminals, background agent placement and
-`terminal.placeOwned`. The capture also ran 190 app host-control contract tests.
+**Source:** `daintreehq/daintree` commit `1752ef90a46df6152f95a0befde2dca46491e44c`,
+`develop`, app 0.46.0. Captured 2026-10-24. This includes direct host control,
+assistant messaging through agent terminals, background agent placement,
+`terminal.placeOwned`, `host.ensureProject`, `host.settings`, and
+`project.runCommand` admitted to Daintree's own assistant at Core as at Full.
+The capture also ran 241 app host-control contract tests.
 
 | file | tools | `mcp.surface` hash |
 |---|---|---|
-| `external.json` | 35 | `713376a5…` |
-| `help-core.json` | 42 | `cf11205c…` |
-| `help-full.json` | 91 | `93d756c0…` |
-| `pane-core.json` | 79 | `834035d0…` |
-| `pane-full.json` | 79 | `ab8e37f0…` |
-| `relayed-core.json` | 37 | `5b17fc0d…` |
-| `relayed-full.json` | 80 | `7f7f87b2…` |
+| `external.json` | 35 | `e037a9a2…` |
+| `help-core.json` | 45 | `442ecb41…` |
+| `help-full.json` | 93 | `2f9f2157…` |
+| `pane-core.json` | 79 | `9ca140da…` |
+| `pane-full.json` | 79 | `0e6e52f9…` |
+| `relayed-core.json` | 38 | `04077ad3…` |
+| `relayed-full.json` | 80 | `7f5f06b9…` |
 
 Full hashes and caller/tier details are in each file's `capture`.
 
@@ -32,7 +34,7 @@ Full hashes and caller/tier details are in each file's `capture`.
 file records two narrower variants in `capture.variants`: a help session this
 machine runs for a remote Shell's window (no `host.*`), and this machine's
 assistant running with no window (#13511), which is what a host's assistant a
-Shell started through `host.call` `assistant.start` works with (30 tools at Core).
+Shell started through `host.call` `assistant.start` works with (34 tools at Core).
 
 `host.call {hostId, projectId, tool, args?, callId?}` runs `tool` with `args`
 through a session the host opens for the calling assistant: the relayed surface.
@@ -40,8 +42,8 @@ It is origin `external`, bound to the one project, at the caller's own Tool set,
 with no approval route, so the tier is a ceiling. It carries the owned terminal
 twins (`terminal.sendCommandOwned` with `generation`, `handback` and `notify`,
 `terminal.readLastMessageOwned`, `terminal.interruptOwned`, ...), `assistant.list`,
-`assistant.start` and `agent.readQuota` at both tiers, and `project.runCheck`,
-`project.runCommand` and `terminal.new` at Full only. It never carries a `host.*`
+`assistant.start`, `agent.readQuota` and `project.runCommand` at both tiers, and
+`project.runCheck` and `terminal.new` at Full only. It never carries a `host.*`
 tool (a call does not chain) or `help.displayImage`. A host with no window on the
 project lists less to a relay (`capture.variants.no_view_attached`), but calls
 name a tool by id and run regardless.
@@ -101,7 +103,7 @@ dots kept, no prefix, no escaping (`terminal.sendCommandOwned`). Daintree
 registers itself under the server key `daintree`, so Claude Code shows these as
 `mcp__daintree__<name>`.
 
-**Agent panes list the same 78 tools at core and full.** A pane's tier is where
+**Agent panes list the same 79 tools at core and full.** A pane's tier is where
 auto-approval stops, not a ceiling (#12692). The two pane files are identical on
 the wire; they differ only in `daintree.reach`, `daintree.surface_tier` and the
 surface hash. A pane is never offered `host.call`, `assistant.*`,
@@ -113,6 +115,13 @@ and at Full `terminal.inject`, `kill`, `restart`, `closeAll`). Every other
 session, the relayed one included, gets the owned form and loses the tools that
 have none. There is no unscoped `terminal.interrupt` on any surface:
 `terminal.interruptOwned` is it.
+
+**The command runner answers to its caller.** `project.runCommand` is admitted
+by `mayRunProjectCommand` (`electron/services/mcp-server/tierAuth.ts`), not the tier
+allowlist: Daintree's own assistant (origin `help`) or a relay, at Core or Full.
+Never a pane or an API-key client, and no grant widens it, so its `daintree.reach`
+is `caller`. `project.runCheck` is a tier tool and stays Full only, here and on a
+relay.
 
 **`notify`.** `terminal.sendCommand(Owned)`, `agent.launch` and the batch tools
 take `notify: boolean` for panes, the assistant and a relay. The external listing

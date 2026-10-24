@@ -2,8 +2,8 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "1006cbca719950c122d995c7b378138a3968aaa2",
-    "app_version": "0.45.0",
+    "app_commit": "1752ef90a46df6152f95a0befde2dca46491e44c",
+    "app_version": "0.46.0",
     "caller_origin": "relayed",
     "session_origin": "external",
     "tier": "core",
@@ -13,25 +13,25 @@
       "renderer_owned_origin": false,
       "relay": true
     },
-    "caller": "The session a Remote Host opens for a Shell's assistant reaching it through host.call (openRelaySession, #13493), at the calling assistant's Tool set = Core: origin 'external', bound to the one host project the call names, deps.relay set, no approval route, and the relay principal an assistant caller in that project. Listed from a live view of the bound project in which no Remote Host has been added. Never offered a host.* tool or help.displayImage, whatever its tier; gets the owned terminal twins; assistant.list, assistant.start and agent.readQuota by the assistant-caller rule. What host.call can name on a host is this listing.",
+    "caller": "The session a Remote Host opens for a Shell's assistant reaching it through host.call (openRelaySession, #13493), at the calling assistant's Tool set = Core: origin 'external', bound to the one host project the call names, deps.relay set, no approval route, and the relay principal an assistant caller in that project. Listed from a live view of the bound project in which no Remote Host has been added. Never offered a host.* tool or help.displayImage, whatever its tier; gets the owned terminal twins; assistant.list, assistant.start and agent.readQuota by the assistant-caller rule, and project.runCommand by the command-runner rule (#13501), held to the drive rule at the call. What host.call can name on a host is this listing.",
     "host_control": {
       "help_session": false,
       "call_reachable": null,
       "host_tools_offered": false,
       "assistant_caller": "relay",
       "assistant_tools_offered": true,
-      "command_runner_offered": false
+      "command_runner_offered": true
     },
     "machine": {
       "added_remote_hosts": false,
       "manifest_source": "view"
     },
-    "captured_at": "2026-10-21",
+    "captured_at": "2026-10-24",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "5b17fc0d853d51f2fcac45c4ff23c43a39d7fad7cacf38fbcf07ce154b19b307",
+    "surface_hash": "04077ad3305b1b5e57880d0e083306b3d1fd5386d2137324b0bc69308a017a06",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest and session policy)",
-    "tool_count": 37,
+    "tool_count": 38,
     "allowlisted_but_not_listed": [
       {
         "action_id": "help.displayImage",
@@ -52,14 +52,14 @@
           "host_tools_offered": false,
           "assistant_caller": "relay",
           "assistant_tools_offered": true,
-          "command_runner_offered": false
+          "command_runner_offered": true
         },
         "machine": {
           "added_remote_hosts": false,
           "manifest_source": "no-view"
         },
         "tool_count": 24,
-        "surface_hash": "95b1bbf3398d1867adb95114834db36a489b111584940dd87499dd007bda5d84",
+        "surface_hash": "2128d0d6c2b24c47b082226002e15f7fcb956985ea2e9e463368794c500b30aa",
         "added": [],
         "removed": [
           "agent.launchMany",
@@ -67,6 +67,7 @@
           "agent.readQuota",
           "assistant.list",
           "assistant.start",
+          "project.runCommand",
           "slashCommands.list",
           "terminal.closeMany",
           "terminal.moveToWorktree",
@@ -412,14 +413,15 @@
                   "panel-limit",
                   "already-launching",
                   "spawn-failed",
-                  "unavailable"
+                  "unavailable",
+                  "host-memory"
                 ]
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Null on a launch, else why not: panel-limit (see panelLimit), already-launching (retry), missing-cli (setup panel opened)."
+            "description": "Null if launched. panel-limit: see panelLimit; already-launching, host-memory: retry; missing-cli: setup opened."
           },
           "worktreeId": {
             "type": [
@@ -1463,6 +1465,103 @@
       }
     },
     {
+      "action_id": "project.runCommand",
+      "wire_name": "project.runCommand",
+      "description": "Run one non-interactive shell command on this host and return its exit code, output and timing. cwd is where it starts, not a sandbox: it runs as the host's user. A non-zero exit is a result, not an error. Never for servers or prompts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Project id from the project listing."
+          },
+          "command": {
+            "type": "string",
+            "description": "Shell command line, run as given, with no stdin or TTY."
+          },
+          "cwd": {
+            "description": "Project root or one of its worktrees (default: root).",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Ms before the process tree is killed (default 600000).",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "projectId",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "exitCode": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "signalName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "timedOut": {
+            "type": "boolean"
+          },
+          "aborted": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "string"
+          },
+          "outputTruncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "projectId",
+          "cwd",
+          "exitCode",
+          "signalName",
+          "durationMs",
+          "timedOut",
+          "aborted",
+          "output",
+          "outputTruncated"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Run command",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": true,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "project",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "caller"
+      }
+    },
+    {
       "action_id": "recipe.list",
       "wire_name": "recipe.list",
       "description": "List the project's saved recipes, named multi-terminal setups from the user or plugins, each with its origin, to find recipe ids. Never fails; an empty list while still loading means not read yet, not none.",
@@ -1496,7 +1595,7 @@
     {
       "action_id": "slashCommands.list",
       "wire_name": "slashCommands.list",
-      "description": "List the slash commands an agent CLI offers, including project-local ones, before driving the agent with one. An empty list means it has none; a project that is not open fails.",
+      "description": "List the slash commands an agent CLI offers, including project-local ones, before driving the agent with one. An empty list means it has none.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1824,7 +1923,7 @@
                   "type": "number"
                 },
                 "lastTypedInputAt": {
-                  "description": "Epoch ms of the last raw PTY input (keys, paste, broadcast; not sends). Before `lastTransitionAt` means none since. Not proof of delivery or authorship.",
+                  "description": "Epoch ms of last PTY input (keys, paste, broadcast, withdrawn sends). Before `lastTransitionAt` means none since. Not proof of delivery or authorship.",
                   "type": "number"
                 },
                 "exitCode": {
@@ -2208,6 +2307,46 @@
                       "type": "null"
                     }
                   ]
+                },
+                "restored": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "number"
+                    },
+                    "disposition": {
+                      "type": "string",
+                      "enum": [
+                        "resume",
+                        "fresh",
+                        "held"
+                      ]
+                    },
+                    "heldReason": {
+                      "type": "string"
+                    },
+                    "lastSeen": {
+                      "type": "object",
+                      "properties": {
+                        "agentState": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "agentState"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "at",
+                    "disposition"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Set when restore rebuilt the pane (`at`, epoch ms). lastSeen: agent state saved before then, not proof a run ended."
                 }
               },
               "required": [
@@ -3406,6 +3545,13 @@
                 },
                 "hasLiveView": {
                   "type": "boolean"
+                },
+                "frontendAttached": {
+                  "description": "A frontend is attached: a view here or a driving Shell. If false, only tools the host runs itself run. Null: unknown.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -3413,7 +3559,8 @@
                 "path",
                 "name",
                 "kind",
-                "hasLiveView"
+                "hasLiveView",
+                "frontendAttached"
               ],
               "additionalProperties": false
             }
@@ -3753,7 +3900,7 @@
     {
       "action_id": "worktree.waitUntilReady",
       "wire_name": "worktree.waitUntilReady",
-      "description": "Wait for a worktree's post-create setup (config copy, submodules, setup script, provisioning) and report where it got. Setup can outlive creation, so work started earlier may see an unpopulated tree. A zero timeout reads without blocking; running out of time is not a failure.",
+      "description": "Wait for a worktree's post-create setup (config copy, submodules, setup script, provisioning, plugin steps) and report where it got. Setup can outlive creation, so earlier work may see an unpopulated tree. A zero timeout reads without blocking; timing out is not a failure.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3790,7 +3937,7 @@
               "needs-approval",
               "unknown"
             ],
-            "description": "pending, running (config copy, submodules, setup script or provisioning), ready, failed, timed-out, needs-approval (repo setup commands await the user's approval; you can't give it), or unknown (not created by this host, or it restarted since)."
+            "description": "pending, running (config copy, submodules, setup script, provisioning, plugin steps), ready, failed, timed-out, needs-approval (awaits the user's approval; you can't give it), or unknown (not created by this host, or it restarted since)."
           },
           "stage": {
             "anyOf": [
@@ -3799,7 +3946,8 @@
                 "enum": [
                   "copy-config",
                   "submodules",
-                  "setup-script"
+                  "setup-script",
+                  "plugin-steps"
                 ]
               },
               {

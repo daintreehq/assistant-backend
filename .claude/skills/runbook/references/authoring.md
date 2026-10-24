@@ -121,8 +121,8 @@ and stated with its date ("September 2026 builds; revalidate").
   only it is offered `host.list` and `host.call` (direct control of a Remote Host) and
   `assistant.list`/`assistant.start`.
 - **What a host offers inside `host.call`** (`relayed-*`): the owned tools, agents,
-  worktrees and `assistant.*` at the caller's Tool set, and at Full the checks and
-  `project.runCommand`. Never a `host.*` tool. A `host.call` example's `tool` and
+  worktrees, `assistant.*` and `project.runCommand` at the caller's Tool set, and at
+  Full the checks (`project.runCheck`). Never a `host.*` tool. A `host.call` example's `tool` and
   `args` are validated against it.
 - **API-key client** (`external`): a curated subset with **no `notify`** on
   `agent.launch` or the sends and no `terminal.notifyWhenIdle`.

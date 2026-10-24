@@ -181,9 +181,12 @@ def test_only_the_shells_own_assistant_controls_a_host() -> None:
         assert capture(surface)["capture"]["session"]["relay"] is True
         assert not {tool for tool in offered if tool.startswith("host.")}, surface
         assert {"assistant.list", "assistant.start", "terminal.sendCommandOwned"} <= offered
-    # The command runner is Full only, for a relay as for the Shell's assistant.
-    assert "project.runCommand" in action_ids("relayed-full")
-    assert "project.runCommand" not in action_ids("relayed-core")
+    # The command runner answers to its caller, not the tier: the Shell's own assistant
+    # and a relay at either in-app tier, never a pane or an API-key client.
+    for surface in ("help-core", "help-full", "relayed-core", "relayed-full"):
+        assert "project.runCommand" in action_ids(surface), surface
+    for surface in ("pane-core", "pane-full", "external"):
+        assert "project.runCommand" not in action_ids(surface), surface
 
 
 def test_a_host_call_reaches_the_relayed_surface_of_its_own_tier() -> None:

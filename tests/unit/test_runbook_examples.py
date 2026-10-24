@@ -151,13 +151,18 @@ def test_a_host_call_is_validated_inside_as_well() -> None:
         "control", hosts, "host.call", None, _host_call("terminal.sendCommandOwned", send)
     )
     command = {"projectId": "<projectId>", "command": "npm test"}
+    for tier in ("help-core", "help-full"):
+        validate_example(
+            "control", hosts, "host.call", tier, _host_call("project.runCommand", command)
+        )
+    check = {"projectId": "<projectId>", "runnerId": "<runnerId>"}
     validate_example(
-        "control", hosts, "host.call", "help-full", _host_call("project.runCommand", command)
+        "control", hosts, "host.call", "help-full", _host_call("project.runCheck", check)
     )
 
     failures: list[tuple[str | None, dict[str, Any]]] = [
-        # The command runner is Full only, on the host as here.
-        (None, _host_call("project.runCommand", command)),
+        # The check runner is Full only, on the host as here.
+        (None, _host_call("project.runCheck", check)),
         # The relay has the owned twin only.
         (None, _host_call("terminal.sendCommand", send)),
         # A call never chains.
