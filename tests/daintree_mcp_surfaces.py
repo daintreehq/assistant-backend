@@ -93,7 +93,14 @@ def capture(surface: str, model: Model = "control") -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def listed_action_ids(surface: str, model: Model = "control") -> set[str]:
+    """What a caller's `tools/list` actually carries, which for a global caller can be
+    less than what it may call (`input_schemas`)."""
+    return {str(tool["action_id"]) for tool in capture(surface, model)["tools"]}
+
+
 def input_schemas(surface: str, model: Model = "control") -> dict[str, Any]:
+    """The tools a caller may call, by id, with their input schemas."""
     if surface in GLOBAL_TIER_SURFACE:
         recorded = capture(surface, model)
         root = set(recorded["capture"]["root_tools"])
@@ -221,6 +228,10 @@ def untagged_example_surfaces(runbook_id: str, model: Model = "control") -> tupl
     every surface but the non-pane ones, pane first, so a pane runbook's sidebar-branch
     example must name its surface (``surface=help-full``) to validate at all."""
     callers = baseline_callers(runbook_id, model)
+    if callers and callers[0] in GLOBAL_TIER_SURFACE:
+        # Written for the global caller: an untagged example is its, so a project step
+        # is written inside `host.call`; a project Assistant's variant names its surface.
+        return tuple(caller for caller in callers if caller in GLOBAL_TIER_SURFACE)
     if callers != PANE_CALLERS:
         return callers
     return tuple(

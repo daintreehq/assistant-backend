@@ -114,6 +114,18 @@ import {
   GLOBAL_ALLOWED_TOOLS,
   GLOBAL_WITHHELD_TOOLS,
 } from "../../../../electron/remote/assistant/HostCallRuntime";
+import {
+  RUNBOOKS_MCP_SERVER_NAME,
+  buildRunbooksAddendum,
+  buildRunbooksHostHeaders,
+} from "../../../../electron/services/helpSessionRunbooks";
+import {
+  ASSISTANT_GLOBAL_CHECKPOINT_BUCKET,
+  ASSISTANT_RUN_CHECKPOINT_ENV_VAR,
+  ASSISTANT_RUN_CHECKPOINT_WRITER_ENV_VAR,
+  buildRunCheckpointAddendum,
+} from "../../../../electron/services/AssistantRunCheckpointService";
+import { ASSISTANT_SCRATCH_ENV_VAR } from "../../../../electron/services/AssistantScratchService";
 import { ASSISTANT_CONTROL_TOOL_IDS } from "@shared/types/assistantControl";
 import {
   bindHostControl,
@@ -966,8 +978,10 @@ describe("capture Daintree MCP surfaces", () => {
             call_reachable: spec.helpSession ? spec.hostControlReachable : null,
             host_tools_offered: gates.hostCall,
             assistant_caller: spec.assistantCaller,
-            assistant_tools_offered: gates.assistantCaller,
-            command_runner_offered: gates.commandRunner,
+            // The global assistant passes the caller rules, then lists and runs
+            // only its root tools: what it is effectively offered.
+            assistant_tools_offered: gates.assistantCaller && !spec.global,
+            command_runner_offered: gates.commandRunner && !spec.global,
           },
           // The view that answered the manifest.
           machine: {
@@ -1008,6 +1022,24 @@ describe("capture Daintree MCP surfaces", () => {
                   withheld: sortIds(GLOBAL_WITHHELD_TOOLS),
                   method:
                     "GLOBAL_ALLOWED_TOOLS and GLOBAL_WITHHELD_TOOLS imported from electron/remote/assistant/HostCallRuntime.ts at this commit. What a call can name is the relayed surface of the same Tool set narrowed to `admits`: the host still applies its tier, ownership and drive rule.",
+                },
+              }
+            : {}),
+          // What Daintree provisions this assistant's CLI with besides the MCP
+          // (HelpSessionService): the runbook server, its headers, the
+          // runbook and checkpoint instructions, and the env its PTY gets.
+          ...(spec.global
+            ? {
+                native_setup: {
+                  runbooks_mcp_server: RUNBOOKS_MCP_SERVER_NAME,
+                  runbooks_headers_connected: buildRunbooksHostHeaders("connected"),
+                  runbooks_headers_unknown: buildRunbooksHostHeaders(null),
+                  runbooks_addendum: buildRunbooksAddendum({ global: true }),
+                  checkpoint_env: ASSISTANT_RUN_CHECKPOINT_ENV_VAR,
+                  checkpoint_writer_env: ASSISTANT_RUN_CHECKPOINT_WRITER_ENV_VAR,
+                  checkpoint_bucket: ASSISTANT_GLOBAL_CHECKPOINT_BUCKET,
+                  checkpoint_addendum: buildRunCheckpointAddendum(),
+                  scratch_env: ASSISTANT_SCRATCH_ENV_VAR,
                 },
               }
             : {}),

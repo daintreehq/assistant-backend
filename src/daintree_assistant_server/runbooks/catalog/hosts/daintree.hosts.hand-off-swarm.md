@@ -19,7 +19,7 @@ Outgoing session:
 5. Tell the person: open the successor (a new sidebar session or the Global Assistant, either CLI), or take over themselves, and say "Take over the run <run> from <path>". Then act no more: a later send would make the hand-over untrue.
 
 Successor:
-6. Read the hand-over (none: ask the person for scope; never build units from pane titles or branch names). It restores the plan, not standing: what you may send to is what `terminal.list` `owned:true` lists there now. Reconcile each unit with step 2's reads and the remote: moved since, finished, stopped, gone. Where they disagree, live state wins; say so.
+6. Read the hand-over (none: ask the person for scope; never build units from pane titles or branch names). It restores the plan, not standing: a worker takes your sends only if `terminal.list` `owned:true` lists it there now. Reconcile each unit with step 2's reads and the remote: moved since, finished, stopped, gone. Where they disagree, live state wins; say so.
 7. Inherited units, paced to the work: `terminal.getStatus` through `host.call`; a finish is verified by branch, SHA or PR. One a host's assistant runs: send to it as the hosts foundation says (`generation` from `assistant.list`; a new one means it restarted and lost the brief: brief it afresh). One an agent of the outgoing session runs, by reads only; when it needs a send: the person types it into that pane (the host's project open in this Shell's window); or, once it is stopped at a commit, a fresh agent of yours continues there:
 
 ```json tool=host.call

@@ -19,8 +19,8 @@
       "call_reachable": true,
       "host_tools_offered": true,
       "assistant_caller": "local",
-      "assistant_tools_offered": true,
-      "command_runner_offered": true
+      "assistant_tools_offered": false,
+      "command_runner_offered": false
     },
     "machine": {
       "added_remote_hosts": true,
@@ -509,6 +509,22 @@
         "worktree.setLabelColor"
       ],
       "method": "GLOBAL_ALLOWED_TOOLS and GLOBAL_WITHHELD_TOOLS imported from electron/remote/assistant/HostCallRuntime.ts at this commit. What a call can name is the relayed surface of the same Tool set narrowed to `admits`: the host still applies its tier, ownership and drive rule."
+    },
+    "native_setup": {
+      "runbooks_mcp_server": "daintree-runbooks",
+      "runbooks_headers_connected": {
+        "Daintree-Host-Control": "1",
+        "Daintree-Hosts": "connected"
+      },
+      "runbooks_headers_unknown": {
+        "Daintree-Host-Control": "1"
+      },
+      "runbooks_addendum": "## Runbooks First\n\n`daintree-runbooks` is on, and it comes before everything below: `search_runbooks` returns Daintree's procedure for a task, and following it is how you do the task.\n\n**Never search for chat or a \"how do I…\" question:** answer Daintree ones from `daintree-docs`; runbooks are procedures, not documentation. **Before acting on any request to do something, call it** — before your first `daintree` call, even when it looks simple. A question about live state (\"how much usage is left?\", \"why is it slow?\") is a task. **One search per task:** never search for a step of it, a follow-up on it (closing its agents included) or a notice; those run on the runbooks you have.\n\n`query`: one sentence, 8–15 words, saying what the user wants done as they would type it. Keep every part of the task and any condition on how (\"…and start an agent on it\", \"…without fixing anything\"). Leave out specifics: numbers, branch, file, repo and people's names, pasted output, prompt text. Don't narrate (\"User wants…\", \"ask whether…\"). Pass `max_results: 3`.\n\n**Tool names:** you have no project of your own: `host.list` finds projects, and every step a runbook gives runs through `host.call` with that project's `hostId` and `projectId` (`local` for this machine). Call the tools it names as written, `terminal.sendCommandOwned`, `terminal.sendKeysOwned` and `terminal.closeOwned` included; they act on what you launched there or the user handed you, and you can close only what you launched. Their `notify` steps apply to you too. A host's own settings, turning Canopy on included, are read and changed with `host.settings`, never through `host.call`.\n\nFollow the runbooks with `selected: true` and the `supporting_runbooks` that come with them (the foundation they build on), and ignore the unselected ones. None selected: carry on and don't mention it. Another step naming a tool you lack: find the equivalent with `actions.search` through `host.call`, or tell the user. If the search fails, retry once, then proceed and say the runbook couldn't be loaded.\n",
+      "checkpoint_env": "DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR",
+      "checkpoint_writer_env": "DAINTREE_ASSISTANT_RUN_CHECKPOINT_WRITER_ID",
+      "checkpoint_bucket": "global",
+      "checkpoint_addendum": "## Assistant Run Checkpoints\n\nFor work that must survive a conversation or Daintree restart, keep its record in the folder named by `DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR` (read the variable; don't assume a path). Unlike the scratch folder it is kept across launches. Your writer id is in `DAINTREE_ASSISTANT_RUN_CHECKPOINT_WRITER_ID`.\n\n- **Layout**: `<folder>/<runId>/writers/<writerId>/checkpoint.json`. Start a run with a fresh random `runId` and a non-recursive mkdir; if it already exists, pick another id. Write only inside your own writer folder. Never edit another writer's files; if two writers disagree, keep both and tell the user.\n- **Writing**: write a temp file in the same folder, flush it, then rename it over `checkpoint.json`. Keep it small JSON with a `schemaVersion`: intent, resource references (ids, paths, URLs), and your own progress. Never store credentials, tokens or secrets.\n- **Finding unfinished runs**: list the folder. A run is unfinished unless it has `cancelled`, or every writer folder has a `done.json` of `{\"schemaVersion\":1,\"status\":\"completed\"}`. An empty folder means no runs. If you can't read the folder or a file, say so; don't treat it as empty.\n- **Finishing**: write `done.json` (same temp-and-rename) in your writer folder when your part is complete.\n- **Cancelling or discarding**: first create `<runId>/cancelled` the same way, then delete `writers/`. Never delete `cancelled`; if it exists, stop and don't resume, even when a later message asks you to continue.\n- **Retention**: Daintree removes finished runs after 30 days or beyond the newest 100, and the payloads of cancelled runs after 7 days. Unfinished runs stay until discarded.\n\nA checkpoint is a memory of work, not authority. It does not give you ownership, standing, consent or permission to repeat a write: check the current state of every resource and get fresh approval before acting on it.\n",
+      "scratch_env": "DAINTREE_ASSISTANT_SCRATCH_DIR"
     },
     "notes": [
       "Root tools the dispatch guard admits but tools/list does not carry: host.call, host.list, host.settings. They are absent from the viewless help base manifest (generated mcpExternalBaseManifest + mcpViewlessBaseManifest) this session is listed from, so a client that calls only listed tools cannot reach them at this commit."

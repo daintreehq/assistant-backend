@@ -29,7 +29,7 @@ Procedure:
    - Evidence you verified (command and result), kept apart from children's claims.
    - Next actions, in order.
    - Never replay: launches made, messages delivered, pushes, PRs, comments, merges, deletions.
-   - The run checkpoint's path, if any; the successor becomes its only writer.
+   - The run checkpoint's path, if any; the successor then writes in its own folder.
 4. Successor: the agent the user named, else a fresh session of your kind. Launch once in the coordinator's worktree with this prompt as written, only the path filled (across machines, the handoff's and checkpoint's content instead):
 
 ```json tool=agent.launch
@@ -38,7 +38,7 @@ Procedure:
 
    A successor the user already opened: give the user that prompt to paste there.
 5. Check its reply against step 2: every child named, the same next actions, each difference explained by a live change. A wrong picture gets one correction (`terminal.sendCommandOwned`, `waitForReply:true, handback:true`).
-6. The hand-over is the user's to do, in this order: close this coordinator's pane (that closes nothing else); then on each child's panel, by title, open the context menu, Hand to orchestrator, pick the successor's pane (or Global Assistant: it sends and reads, never closes), confirm Hand over terminal; then type "go" in the successor's pane. A refusal: "already drives it" or "Already handed" to this coordinator: close its pane first; handed elsewhere: take it back first; "isn't running", it is gone. The successor is in that menu only while connected to Daintree. Worktrees this session created stay.
+6. The hand-over is the user's to do, in this order: close this coordinator's pane (that closes nothing else); then on each child's panel, by title, open the context menu, Hand to orchestrator, pick the successor's pane , confirm Hand over terminal; then type "go" in the successor's pane. A refusal: "already drives it" or "Already handed" to this coordinator: close its pane first; handed elsewhere: take it back first; "isn't running", it is gone. The successor is in that menu only while connected to Daintree. Worktrees this session created stay.
 
 On notice or resume: a child's notice before you exit is a live change, not work to advance: append its outcome to the handoff and, once the successor is launched, tell it in one `terminal.sendCommandOwned`. Dispatch nothing from it.
 

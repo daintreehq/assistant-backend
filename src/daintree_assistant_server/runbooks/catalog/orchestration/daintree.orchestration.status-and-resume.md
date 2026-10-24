@@ -17,9 +17,13 @@ The app keeps no workflow ledger or record of past MCP calls. The record is your
 
 On a host: your checkpoints are the local record; read live state on the work's machine (these tools and shell steps there, per the hosts foundation); own shell: `gh -R <repo>`.
 
-Several projects on this machine, from a caller offered `host.call` (Daintree's own Assistant; a pane sees only its own project): sweep each project through `host.call` with `hostId` `local` and that `projectId`, never as a remote machine. The global Assistant has no project, so every read below goes that way; it may not resume sessions (`agentSessionHistory.resume` is refused it).
+Several projects on this machine (Daintree's own Assistant; a pane sees only its own): your own project directly, each other one through `host.call` with `hostId` `local` and its `projectId`, never as a remote machine. Take the projects from `host.list` and your checkpoints together: a `projects` list that is null or 50 long may not be all. The global Assistant has no project, so every read goes through `host.call`, and it may not resume sessions:
 
-1. Find the record: open checkpoints and whatever your own session history verifiably shows of the earlier session. Under `$DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR` a run is open unless it has `cancelled` or every writer has a valid `done.json`; a listing error is unknown, never empty. With none, say so, rebuild from live evidence, label earlier decisions unknown, and replay no write from memory.
+```json tool=host.call surface=global-core
+{"hostId":"local","projectId":"<projectId>","tool":"terminal.getStatus","args":{"terminalIds":["<terminalId>"],"includeOutput":{"lines":50}}}
+```
+
+1. Find the record: open checkpoints and whatever your own session history verifiably shows of the earlier session. Under `$DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR`, the open runs as your instructions find them, every writer's; a listing error is unknown, never empty. With none, say so, rebuild from live evidence, label earlier decisions unknown, and replay no write from memory.
 2. Read live state in one pass: across projects or hosts, `host.list` with `includeAgents` first (an `agents` `coverage` other than `ok`, `complete:false` or `omitted` above 0 proves no absence; keep `observedAt`); `terminal.list`; `worktree.list` (`issueNumber`, `prNumber`, `setupState`); one `terminal.getStatus` over recorded and listed agents with `includeOutput`; branch and PR from `git -C <path>` and `gh pr list --repo <owner/repo> --head <branch>`. Offer a focused CI read (daintree.workflow.follow-up-on-issue) rather than one per unit.
 3. Reconcile each recorded unit on evidence, not its recorded status:
    - Present and working: live, if it is the same process: a recorded `incarnation` (`host.list`) or assistant `generation` (`assistant.list`) that changed is a new one, not the unit. A recorded notice request does not prove it is still pending (it may have fired, been cleared, or died with a relaunched pane or restarted app). Say whether anything will wake you.

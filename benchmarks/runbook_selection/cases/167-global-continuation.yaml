@@ -28,10 +28,11 @@ cases:
     note: >-
       What is still running, then only the already-authorised continuation: "what is still
       open or in flight" decides it; status-and-resume hands continuing back to the runbook
-      that started the work.
+      that started the work. The restart is the earlier-session cue that keeps it off
+      daintree.orchestration.supervise-fleet (agents running this minute).
     messages:
       - role: user
-        content: show me what is still running and keep going with the parts I already said yes to
+        content: back after the restart, show me what is still running and keep going with the parts I already said yes to
     expect:
       required: [daintree.orchestration.status-and-resume]
       optional: [daintree.foundation, daintree.orchestration.execute-durable-workflow]
@@ -61,7 +62,24 @@ cases:
         content: after the restart, find out where the jobs I handed to my other machines got to
     expect:
       required: [daintree.hosts.recover-and-clean-up]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: global-continue-local-projects-and-remote-studios
+    category: multi-runbook
+    note: >-
+      The issue's mixed request: this machine's projects are the local sweep
+      (status-and-resume), the work sent to other machines is
+      daintree.hosts.recover-and-clean-up; both load, neither stands in for the other.
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: Resume the plan across my local projects and remote studios after the restart.
+    expect:
+      required: [daintree.orchestration.status-and-resume, daintree.hosts.recover-and-clean-up]
+      optional:
+        - daintree.foundation
+        - daintree.hosts.foundation
+        - daintree.orchestration.execute-durable-workflow
 
   - id: global-continuation-trap-new-work-each-project
     category: routing-trap

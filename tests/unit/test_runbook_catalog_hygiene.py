@@ -37,6 +37,7 @@ from daintree_mcp_surfaces import (
     baseline_violation,
     capture,
     known_action_ids,
+    listed_action_ids,
     rebuild_delta,
 )
 
@@ -460,3 +461,42 @@ def test_the_global_assistant_is_its_own_caller() -> None:
     assert baseline_violation(assistants, ["terminal.sendCommand", "terminal.sendCommandOwned"])
     # And a pane runbook still cannot borrow what host.call reaches for the global caller.
     assert baseline_violation("daintree.release.example", ["host.call", "terminal.list"])
+
+
+def test_the_global_assistants_listing_gap_stays_visible() -> None:
+    """What the global Assistant lists is recorded apart from what it may call: at the
+    captured commit its `tools/list` is empty, and the tests read its root tools'
+    schemas from the help surface rather than pretend they were listed. When a capture
+    lists them, `root_tools_listed` says so and the note goes."""
+    for surface in GLOBAL_SURFACES:
+        recorded = capture(surface)["capture"]
+        listed = listed_action_ids(surface)
+        assert listed <= set(recorded["root_tools"]), surface
+        assert sorted(listed) == recorded["root_tools_listed"], surface
+        unlisted = set(recorded["root_tools"]) - listed
+        noted = any("does not carry" in note for note in recorded.get("notes", []))
+        assert noted == bool(unlisted), surface
+        offered = recorded["host_control"]
+        assert offered["assistant_tools_offered"] is False, surface
+        assert offered["command_runner_offered"] is False, surface
+
+
+def test_the_runbooks_match_what_daintree_provisions_the_global_assistant() -> None:
+    """Native setup, captured from the app: the runbook server and its headers, the
+    instructions that drop the project Assistant's owned-to-unscoped translation, and
+    the checkpoint folder the foundation names, which is not the scratch folder."""
+    catalog = load_catalog()
+    foundation = catalog.get("daintree.foundation")
+    assert foundation is not None
+    for surface in GLOBAL_SURFACES:
+        setup = capture(surface)["capture"]["native_setup"]
+        assert setup["runbooks_mcp_server"] == "daintree-runbooks"
+        assert setup["runbooks_headers_connected"]["Daintree-Hosts"] == "connected"
+        addendum = setup["runbooks_addendum"]
+        assert "you have no project of your own" in addendum
+        assert "`terminal.sendCommandOwned`" in addendum and "as written" in addendum
+        assert "yours is `terminal.sendCommand`" not in addendum
+        assert setup["checkpoint_bucket"] == "global"
+        assert f"`${setup['checkpoint_env']}`" in foundation.body
+        assert setup["scratch_env"] not in foundation.body
+        assert setup["checkpoint_env"] in setup["checkpoint_addendum"]

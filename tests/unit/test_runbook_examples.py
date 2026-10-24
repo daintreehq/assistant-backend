@@ -212,7 +212,19 @@ def test_a_global_callers_host_call_is_held_to_what_the_host_admits_from_it() ->
     for surface, arguments in failures:
         with pytest.raises(AssertionError):
             validate_example("control", assistants, "host.call", surface, arguments)
-    # Its own surface is the root tools alone: a project tool is never called directly.
-    for tool in ("terminal.list", "terminal.sendCommandOwned", "agent.launch"):
-        with pytest.raises(AssertionError):
-            validate_example("control", assistants, tool, "global-core", {})
+    # Its own surface is the root tools alone: a project tool is never called directly,
+    # with arguments the tool itself would accept.
+    direct = {
+        "terminal.list": {},
+        "terminal.sendCommandOwned": send,
+        "agent.launch": {"agentId": "claude", "prompt": "<brief>"},
+    }
+    for tool, arguments in direct.items():
+        validate_example("control", "daintree.release.example", tool, "pane-core", arguments)
+        with pytest.raises(AssertionError, match="is not offered to global-core"):
+            validate_example("control", assistants, tool, "global-core", arguments)
+    # An untagged example there is the global caller's: a direct project read does not
+    # quietly resolve on the project Assistant, whose variant must name its surface.
+    with pytest.raises(AssertionError, match="is not offered to any of its callers"):
+        validate_example("control", assistants, "terminal.list", None, {})
+    validate_example("control", assistants, "terminal.list", "help-core", {})
