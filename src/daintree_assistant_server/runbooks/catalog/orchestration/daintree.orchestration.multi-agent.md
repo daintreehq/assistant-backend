@@ -24,6 +24,6 @@ On a host: call these tools on the work's machine; check code there, per the hos
 5. A reply for an earlier round is late material, relayed only labelled as late. Nothing from a dropped participant counts. A participant whose wait times out: tell the user; proceed without it only if it failed, exited or the user says so, recording it missing, never respawning it.
 6. Stop when positions stop moving, the bound is reached, or they clearly will not agree.
 
-Synthesis: apply your own judgment and check claims against the code, naming the commit or working tree you checked. An appointed judge (agent or user) settles disagreements; you relay, not overrule. Residual disagreement is a valid result. Once it is reported, close the participants you launched, per the foundation, in one `terminal.closeMany`; all stay open if the user wants another round.
+Synthesis: apply your own judgment and check claims against the code, naming the commit or working tree you checked. An appointed judge (agent or user) settles disagreements; you relay, not overrule. Residual disagreement is a valid result. Once it is reported, close the participants you launched, per the foundation, in one `terminal.closeMany`, checking each target's `closedIds`; all stay open if the user wants another round.
 
 Report back: the synthesized answer or residual disagreement; each participant (name, terminal id) and its contribution per round, with late or missing replies; what you verified versus what was claimed; anything pending; any cleanup.
