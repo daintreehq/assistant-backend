@@ -7,18 +7,15 @@ risk: external
 requiredTools:
   - host.list
   - host.call
-optionalTools:
-  - assistant.list
-  - assistant.start
 hostEligibility: connected
 ---
 Fast-forward only: a checkout that needs anything more is reported, never forced. The target is origin's base as your shell reads it: `git ls-remote origin refs/heads/<base>`.
 
 Procedure:
-1. Machines: the hosts the person named, else every `connected` host with `control` in `host.list`; this machine only when asked, the same command in your shell in its checkout. On each host, the project whose `git remote get-url origin` names the repository (https or ssh, `.git` or not; at Core, the project named for it, said as unconfirmed); none: a gap, never a clone.
-2. One call per host. At Tool set Full, the command runner there, as the host's user in the project's root; `timeoutMs` keeps the relay waiting past its 90-second default:
+1. Machines: the hosts the person named, else every `connected` host with `control` in `host.list`; this machine only when asked, the same command in your shell in its checkout. On each host, the project whose `git remote get-url origin` names the repository (https or ssh, `.git` or not); none: a gap, never a clone.
+2. One call per host: the command runner there, as the host's user in the project's root; `timeoutMs` keeps the relay waiting past its 90-second default:
 
-```json tool=host.call surface=help-full
+```json tool=host.call surface=help-core
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"project.runCommand","args":{"projectId":"<projectId>","command":"<sync command>","timeoutMs":300000}}
 ```
 
@@ -28,7 +25,6 @@ Procedure:
 git fetch --quiet origin "+refs/heads/<base>:refs/remotes/origin/<base>" || exit $?; if [ "$(git branch --show-current)" != "<base>" ]; then git fetch --quiet origin "<base>:<base>"; elif [ -n "$(git status --porcelain --untracked-files=no)" ]; then echo "uncommitted changes on <base>"; false; else git merge --ff-only --quiet "origin/<base>"; fi; s=$?; git branch --show-current; git rev-parse "refs/heads/<base>" "refs/remotes/origin/<base>"; exit $s
 ```
 
-   At Core, with no runner listed there: brief that host's assistant (the hosts foundation's Delegating) to run exactly this in that project and reply with its exit code and last three lines; its answer is reported, not read.
 3. Read `result.structured`: `exitCode`, `timedOut`, and the last two lines, the local and remote base SHAs. Up to date: exit 0 and both at the target. Otherwise held, with its last output lines: never switch, stash, reset, clean or force to make it pass; the fix is the person's. `ambiguous`: resend under its `callId`; `expired`: run it again (it is safe to repeat); other outcomes as the hosts foundation reads them.
 4. If origin moved meanwhile (`git ls-remote` again), sync every machine once more against the new target.
 5. A fast-forward installs nothing. If it moved a lockfile or manifest while agents there are running checks, say so; reinstalling under them is the person's call, at a quiet moment.

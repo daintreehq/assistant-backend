@@ -14,7 +14,7 @@ Code only: a deployed service, credentials, data and the run's panes and worktre
 Procedure:
 1. Resolve the named run, per unit: host, project, worktree id and path, repository, branch, base SHA, its commits, what it builds on, its checks; from your rows, a checkpoint or the units' reports. None: ask the person; no host keeps a brief. Titles, authors and times only find candidates.
 2. Stop writers first: unless every unit's agent has stopped (`terminal.getStatus` through `host.call`), stop the run (daintree.hosts.steer-swarm) and release nothing more of it. A unit still writing waits.
-3. Per unit, its baseline and attribution, as the local runbook says: pushed commits from your shell (a fetch into a scratch clone, `git log <base>..origin/<branch>`); HEAD (H1), local-only commits and dirty files on the host with `project.runCommand` at Full; at Core the undo agent reports them first and changes nothing it cannot match to the list.
+3. Per unit, its baseline and attribution, as the local runbook says: pushed commits from your shell (a fetch into a scratch clone, `git log <base>..origin/<branch>`); HEAD (H1), local-only commits and dirty files on the host with `project.runCommand`.
 
 ```json tool=host.call surface=help-full
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"project.runCommand","args":{"projectId":"<projectId>","command":"git rev-parse HEAD && git status --porcelain && git log --format='%H %P %s' <base>..HEAD","cwd":"<worktree path>"}}
@@ -31,7 +31,7 @@ Procedure:
 
 On notice or resume:
 - Questions: this stage's from every host, one list to the person; each answer names its unit.
-- A finish is a claim. Verify as the local runbook's resume step says: no operation in progress, each revert the inverse of its original, changed files inside the reverted commits', saved work kept, the checks re-run, the remote branch unchanged; at Full with `project.runCommand` and `project.runCheck` through `host.call`; at Core a second fresh agent there runs those reads and reports their raw output, reported as its claim, not your check. Short of that: one narrow question to that agent (`terminal.sendCommandOwned`, `notify:true`).
+- A finish is a claim. Verify as the local runbook's resume step says: no operation in progress, each revert the inverse of its original, changed files inside the reverted commits', saved work kept, the checks re-run, the remote branch unchanged; with `project.runCommand` (and `project.runCheck` at Full) through `host.call`. Short of that: one narrow question to that agent (`terminal.sendCommandOwned`, `notify:true`).
 - What a stage builds on is reverted only after all its dependents verify; a failed or open one blocks it.
 - No notice: `terminal.getStatus` through `host.call`, paced to the work. Agent gone or host restarted: never relaunch blindly; read which reverts exist past H1, then brief only the remainder.
 

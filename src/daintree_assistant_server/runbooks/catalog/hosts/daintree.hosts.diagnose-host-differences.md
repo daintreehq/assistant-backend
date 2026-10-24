@@ -17,21 +17,17 @@ Fix nothing: no edits, cache deletion, settings changes, pushes, installs outsid
 4. The run at the SHA, the same on every host: that worktree if clean at the SHA, else a fresh one (`worktree.createWithRecipe` `newBranch` `diag/<short sha>` from `origin/<branch>`, `fromRemote:true`, then `worktree.waitUntilReady`; HEAD not the SHA: say so, run nothing). Record exit code, counts, failing tests, first error, start time, duration; at the cap it is incomplete: a hang, with its last output.
 5. Fingerprint, the same fields from every host, unknown as unknown: OS and release, architecture; runtime, package manager, tool and plugin versions the command uses; installed versions of the dependencies the failure involves; locale, timezone; services reached (host, port, database). No secrets: no env dumps; strip credentials from URLs and errors.
 
-Steps 3 to 5, at Tool set Full: `project.runCommand` with `cwd` the worktree path, `timeoutMs` the cap (at most 4 at once per host):
+Steps 3 to 5: `project.runCommand` with `cwd` the worktree path, `timeoutMs` the cap (at most 4 at once per host):
 
-```json tool=host.call surface=help-full
+```json tool=host.call surface=help-core
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"project.runCommand","args":{"projectId":"<projectId>","command":"<exact command>","cwd":"<worktree path>","timeoutMs":900000}}
 ```
-
-   At Core: one agent per host in that worktree, `agent.launch` with `handback:true`, `notify:true` and steps 3 to 5 as its brief, "fix nothing" first; end the turn.
 
 6. Compare, in order:
    - Off the SHA, another `origin`, changed source, another lockfile hash or a stale build: a revision mismatch, reported first. It explains the original result only if the runs at the SHA agree.
    - Runs at the SHA; of incomplete ones, only hangs. Still different: every fingerprint difference, ranked by the evidence tying it to the failure (the error text, a confirmation run); untested ones stay hypotheses.
 7. Confirmation, within the person's authority: on the failing host, the same command in the same worktree with one variable changed (`TZ=UTC`, a runtime it already has), nothing persisted.
 
-On notice or resume: an agent's figures are claims: its HEAD against the pin, its exit code against its screen (`terminal.getStatus` with `includeOutput` there). A missing field: one narrow `terminal.sendCommandOwned` to it, `notify:true`.
+Stop and recovery: one run per host per round; another SHA or an unasked re-run is a new request. Worktrees made here stay, named in the report.
 
-Stop and recovery: one run per host per round; another SHA or an unasked re-run is a new request. Once compared, close the agents made here (`terminal.closeOwned` there), keeping the failing host's and any still running; worktrees made here stay, named in the report.
-
-Report back: SHA, command; per host, attributed (read by you, or claimed by its agent): checkout, run, fingerprint; differences ranked with their evidence; a correction proposed, unapplied; what was left on each host.
+Report back: SHA, command; per host: checkout, run, fingerprint; differences ranked with their evidence; a correction proposed, unapplied; what was left on each host.

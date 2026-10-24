@@ -17,7 +17,7 @@ Daintree's part is attribution (machine, worktree, panel, owner); the trap is ki
 
 Which machine: each has its own loopback; a host's 3000 and this Shell's 3000 are two ports, never one clash. Your shell and listings are where your session runs (a pane or sidebar in a host's window: that host).
 
-On a host: its server is inspected there, never here: each step through `host.call`, shell steps by `project.runCommand` (Full) or an agent there (Core), read-only until step 4 allows a stop.
+On a host: its server is inspected there, never here: each step through `host.call`, shell steps by `project.runCommand` there, read-only until step 4 allows a stop.
 
 1. Identify the listener: `lsof -nP -iTCP:<port> -sTCP:LISTEN`; Linux without lsof: `ss -ltnp 'sport = :<port>'`, then `readlink /proc/<pid>/cwd`. For each PID: `ps -o pid,ppid,lstart,command -p <pid>` and its cwd (`lsof -a -p <pid> -d cwd`). The port is free only when the inspection succeeded with no listener; a missing tool, a permission error or an unreadable process is unknown. A server that still fails may bind another address or port: quote its error.
 2. Classify: a container (`com.docker.backend`, `docker-proxy`), a forward (`ssh`), a system service, or a project process whose cwd is inside a checkout. On a Shell, `ssh` or Daintree itself on a loopback port may be a Remote Host forward: the Ports view (Hosts overview) confirms it, as `localhost:<local>` and the host port. The host's number is kept only if free here; Dev Preview and page links clicked in a remote terminal follow another, a browser panel or sign-in callback refuses ("in use on this machine"). Loopback only: no other host reaches it.

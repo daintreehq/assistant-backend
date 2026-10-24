@@ -21,7 +21,7 @@ Procedure:
 
 On notice or resume:
 - Holds: decide nothing until every side has replied or is confirmed stopped. Never name the other side's agent or ask either to judge the other.
-- Evidence, yours: pin pushed SHAs (`git ls-remote` from your shell), read pushed diffs in a scratch clone; unpushed work from the hold reply, and at Full `project.runCommand` there (`git status --porcelain`, `git log --oneline origin/<branch>..HEAD`, `git diff --stat`), all against the acceptance.
+- Evidence, yours: pin pushed SHAs (`git ls-remote` from your shell), read pushed diffs in a scratch clone; unpushed work from the hold reply, and `project.runCommand` there (`git status --porcelain`, `git log --oneline origin/<branch>..HEAD`, `git diff --stat`), all against the acceptance.
 - Decide one owner on fit to the authorised brief and progress; the person decides scope it leaves open, or when the evidence cannot separate them. No merge or race unasked.
 - Execute through `host.call`, one `terminal.sendCommandOwned` per side with `handback:true, notify:true`, then end the turn:
   - Owner: "You own <unit> (pin <branch> at <SHA>); only you push or publish it, as authorised<; take <commits> from <branch>>. State in one line what you own, then continue." Its agent gone: a fresh agent on that host from the pin (daintree.hosts.delegate-to-host).

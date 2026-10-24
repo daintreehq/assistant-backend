@@ -9,23 +9,19 @@ requiredTools:
   - host.call
 hostEligibility: connected
 ---
-Read-only on every host: nothing is removed, stopped, fetched there or pushed, and nothing closed but your own audit agents. Every read below is a `host.call` to that host and project unless it says your shell.
+Read-only on every host: nothing is removed, stopped, closed, fetched there or pushed. Every read below is a `host.call` to that host and project unless it says your shell.
 
 1. The run's items per host and project, from the plan and ids you kept: worktree id, branch, terminal id, port, each with its `hostId` and `projectId`. Match only by those; anything that merely resembles one is another owner's: counted, unjudged. No record of an item: unknown, never the run's.
 2. Coverage: `host.list`. A host not `connected` or `control:false`, a project missing from its `projects`, or a call that is not `ok` is a gap, never "nothing there".
 3. Inventory per audited project: `worktree.list` (id, path, branch, status); `terminal.list` with no filter and with `location:"background"` (background panels still run); one `terminal.getStatus` over the agent terminals: `working` or `waiting` means in use, whatever git says.
-4. Git and listeners per run worktree: the reads of daintree.worktree.audit-worktrees step 2, minus any fetch: status (dirty, untracked, conflicts), an operation in progress, commits on no remote, HEAD; then the listeners: `lsof -nP -iTCP -sTCP:LISTEN`, and `lsof -a -p <pid> -d cwd` for each, to find those inside a run worktree or on a named port. At Tool set Full, `project.runCommand` with `cwd` the worktree path (at most 4 at once per host):
+4. Git and listeners per run worktree: the reads of daintree.worktree.audit-worktrees step 2, minus any fetch: status (dirty, untracked, conflicts), an operation in progress, commits on no remote, HEAD; then the listeners: `lsof -nP -iTCP -sTCP:LISTEN`, and `lsof -a -p <pid> -d cwd` for each, to find those inside a run worktree or on a named port. `project.runCommand` with `cwd` the worktree path (at most 4 at once per host):
 
-```json tool=host.call surface=help-full
+```json tool=host.call surface=help-core
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"project.runCommand","args":{"projectId":"<projectId>","command":"git status --porcelain=v2 --branch; git rev-list --count HEAD --not --remotes; git rev-parse HEAD","cwd":"<worktree path>","timeoutMs":60000}}
 ```
-
-   At Core: one read-only agent per project, `agent.launch` in its main worktree with `handback:true`, `notify:true` and the brief "Report only; change nothing: no fetch, close, kill, remove or push. For <worktree paths>: <the reads above>. Reply each item's facts and any read that failed." End the turn.
 5. Merged, from your shell on the shared remote: `git ls-remote --heads origin <branch>` (pushed), `gh pr list --state all --head <branch> --json number,state,headRefOid,mergedAt`, and `git merge-base --is-ancestor <host HEAD> <headRefOid>` in your clone (one `git fetch --quiet origin` there is fine; an error is unknown). Git alone misses squash merges. A remote resource the run configured (a cloud devbox) is noted, never probed.
 6. Class per item, every flag named: in use (working or waiting agent, open terminal, listener), dirty or untracked, unpushed, operation in progress, retained service or resource. Safe: clean, idle, no terminal or listener, HEAD inside a merged PR's head, every read ok. Unsafe: any flag. Unknown: pushed but unmerged, a failed read, an unobserved project, an owner unproved, any retained resource. A finished agent is not an abandoned worktree.
 
-On notice or resume: a Core agent's facts are claims; check what is cheap (a pushed claim by `git ls-remote`, a terminal by `terminal.getStatus` there); a missing field gets one narrow `terminal.sendCommandOwned` to that agent. Unchecked stays a claim.
+Stop and recovery: one read pass per project; a lost or empty read is a gap, never retried into a guess. Cleanup the person authorises is daintree.hosts.recover-and-clean-up, which reads again first.
 
-Stop and recovery: one read pass per project, one agent per Core project; a lost or empty read is a gap, never retried into a guess. Close each audit agent there once its facts are checked (`terminal.closeOwned`); one that will not close: name it. Cleanup the person authorises is daintree.hosts.recover-and-clean-up, which reads again first.
-
-Report back: per host and project, each item with class, reasons and the decision it needs; coverage gaps; other owners' items counted; what you read yourself apart from what an agent there claimed; audit agents closed or left open there.
+Report back: per host and project, each item with class, reasons and the decision it needs; coverage gaps; other owners' items counted.
