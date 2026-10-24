@@ -2,7 +2,8 @@
 # the Remote Hosts, come back after a restart, answer the few decisions that need the
 # person, stop assigning, clean up. No runbook owns the whole journey; each step belongs to
 # one procedure, and the step changes the owner. These cases pin the boundary at every
-# change of owner, one recall and one trap per side, grouped by the issue's six scenarios:
+# change of owner, mostly as routing traps (each excluding the neighbour across that
+# boundary), grouped by the issue's six scenarios:
 #
 #   S1 continuation  daintree.orchestration.status-and-resume | daintree.hosts.recover-and-clean-up
 #   S2 capacity      daintree.orchestration.fan-out-work | daintree.orchestration.work-in-waves,
@@ -18,10 +19,11 @@
 #                    daintree.hosts.recover-and-clean-up | daintree.orchestration.workspace-cleanup
 #
 # Each case carries the caller's host state, because the journey crosses it: a hosts
-# runbook is off the ballot for a caller with none, and a local owner must still win its
-# words for a caller with hosts connected. Steps whose owner is still being delivered
-# (a global multi-project caller, an assistant inbox, preparing a project and continuing,
-# capacity-aware refill) have no case here until that owner exists.
+# runbook whose hostEligibility the state does not fit is off the ballot, and a local
+# owner must still win its words for a caller with hosts connected. Steps whose owner is
+# still being delivered (the native global Assistant's own procedures, an assistant inbox,
+# preparing a project and continuing there, capacity-aware refill) have no case here
+# until that owner exists; the S1 cases are this machine's projects, owned today.
 
 cases:
   # S1: local continuation versus remote recovery.
@@ -83,7 +85,7 @@ cases:
     host_state: {hosts: none}
     messages:
       - role: user
-        content: Work through these twenty issues with at most four agents at once, starting the next whenever one finishes
+        content: There are a dozen small chores in the tracker; keep three agents going on them and hand the next chore to whichever agent's slot frees up
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation]
@@ -111,7 +113,7 @@ cases:
     host_state: {hosts: connected}
     messages:
       - role: user
-        content: Here are five unrelated bugs, put each one on whichever of my machines has the most room right now
+        content: I have a docs fix, a flaky test and a perf regression, and none of my machines has been picked yet; decide which host takes each by its free capacity
     expect:
       required: [daintree.hosts.place-work]
       optional: [daintree.hosts.foundation]
@@ -135,8 +137,10 @@ cases:
     note: >-
       Refill across several hosts with merges here: daintree.hosts.drain-issue-backlog
       ("keep both hosts' slots full until nothing is left", "while this machine ... picks
-      the issues and merges"), not daintree.hosts.place-work, which excludes "one first
-      placement of different pieces by load with no picks or merges between".
+      the issues and merges"), not daintree.hosts.place-work: drain-issue-backlog keeps
+      "one first placement of different pieces by load with no picks or merges between"
+      for place-work, and place-work excludes "issues worked through in successive
+      batches ... with picks and merges between".
     host_state: {hosts: connected}
     messages:
       - role: user
@@ -151,8 +155,8 @@ cases:
     note: >-
       The host has no copy yet: daintree.hosts.open-project-on-host ("get my repo onto my
       other Mac", "the host's existing copy of the repository or a fresh clone"), not
-      daintree.hosts.delegate-to-host, fenced out for "a host that already has the
-      project".
+      daintree.hosts.delegate-to-host, which open-project-on-host keeps only for "work
+      sent to ... a host that already has the project".
     host_state: {hosts: configured}
     messages:
       - role: user
@@ -166,11 +170,13 @@ cases:
     note: >-
       The host already has the project: daintree.hosts.delegate-to-host, which
       daintree.hosts.open-project-on-host names for "work sent to ... a host that already
-      has the project".
+      has the project". Phrased as briefing its assistant: "send the fix to the build box"
+      pulls daintree.hosts.reassign-host-work instead (measured 0.995), a boundary for the
+      host-preparation work to settle.
     host_state: {hosts: connected}
     messages:
       - role: user
-        content: The build box already has this project open; send it the flaky test fix as a new task and bring back the branch
+        content: The build box already has this project checked out; have its assistant fix the flaky test and bring back the branch
     expect:
       required: [daintree.hosts.delegate-to-host]
       optional: [daintree.hosts.foundation]
@@ -229,7 +235,7 @@ cases:
     host_state: {hosts: none}
     messages:
       - role: user
-        content: Your context is almost full, hand coordination of these agents over to a fresh session
+        content: "I'm swapping coordinators: write up the state of the six running agents for a new session and let it take over from here"
     expect:
       required: [daintree.orchestration.hand-off-orchestration]
       optional: [daintree.foundation]
@@ -301,7 +307,7 @@ cases:
     host_state: {hosts: configured}
     messages:
       - role: user
-        content: cancel everything I sent to the other machines right now, keep what they have done
+        content: Abort the remote job on every studio immediately, but don't throw away the commits they already made
     expect:
       required: [daintree.hosts.steer-swarm]
       optional: [daintree.hosts.foundation]
@@ -310,8 +316,8 @@ cases:
     category: routing-trap
     note: >-
       A teardown request in the person's own words, with dirty work kept:
-      daintree.orchestration.workspace-cleanup ("classify safe/unsafe/unknown"), not
-      daintree.orchestration.status-and-resume.
+      daintree.orchestration.workspace-cleanup ("Use ONLY when the user explicitly asks to
+      tear down workspace state"), not daintree.orchestration.status-and-resume.
     host_state: {hosts: none}
     messages:
       - role: user
@@ -330,7 +336,7 @@ cases:
     host_state: {hosts: configured}
     messages:
       - role: user
-        content: clean up what that run left on the remote hosts, panes and worktrees, and tell me what each one kept
+        content: Tear down the worktrees and panes our last run created over on the studios, and give me a per-machine list of what stayed and why
     expect:
       required: [daintree.hosts.recover-and-clean-up]
       optional: [daintree.hosts.foundation]
