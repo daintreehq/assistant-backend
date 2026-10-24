@@ -294,6 +294,12 @@ boundaries:
   - query: claude in this window is waiting on a question about the remote host's port, answer 8080
     confusable_with: [daintree.hosts.ask-host-assistant]
     run: runbook-2026-10-issue-88
+  - query: 'the two codex panes I started are asking which test command to use, tell them npm test'
+    confusable_with: [daintree.hosts.answer-assistant-questions]
+    run: runbook-2026-10-24-answer-assistant-questions
+  - query: 'that claude pane is waiting on a yes/no, answer yes'
+    confusable_with: [daintree.hosts.answer-assistant-questions]
+    run: runbook-2026-10-24-answer-assistant-questions
 followups:
   - query: did it finish yet
     history:

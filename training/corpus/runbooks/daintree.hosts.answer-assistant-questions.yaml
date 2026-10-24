@@ -1,0 +1,50 @@
+# daintree.hosts.answer-assistant-questions: Answer what your Daintree Assistants are asking, and bring the rest to the person
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.answer-assistant-questions.md
+
+runbook: daintree.hosts.answer-assistant-questions
+run: runbook-2026-10-24-answer-assistant-questions
+positives:
+  - 'The person comes back from lunch and wants every Daintree Assistant they have, here and on the remote machines, checked for anything it is asking them. Answer the ones their notes from this morning already settle and hand them the rest in one list.'
+  - 'An agent describes its task: walk the assistants in each local project and on each connected host, find the ones that put a question to the user, reply where the user''s standing instructions decide it, and report the open decisions with host, project and slot.'
+  - 'The user agreed a plan yesterday covering naming, test scope and which branch to target. Several assistants across their projects have since asked about exactly those points. They want those answered from the plan and anything outside it brought to them.'
+  - 'Before signing off the person wants their assistants on both studio machines gone through: whatever is waiting on a decision they already made gets the answer, and every approval or new choice comes back to them with the options.'
+  - 'go round my assistants and answer whatever i already told you'
+  - 'do the assistants on my hosts need anything from me? reply if it''s covered'
+  - 'clear my assistants'' questions where you know my answer'
+  - 'which of my daintree assistants are waiting on me, handle the obvious ones'
+  - 'sweep the assistants for open questions and give me only what you can''t answer'
+  - 'my project assistants keep asking things, answer from our plan and list the rest'
+  - 'check all assistants across projects, answer the ones within what i approved'
+  - 'any assistant asking me something on the other macs? answer what you can'
+  - 'triage what my assistants are asking: answer the settled ones, batch the decisions'
+  - 'tell me which assistants need a decision and answer the rest from my earlier instructions'
+  - 'assistants in every project: anything they''re blocked on that I already decided?'
+  - 'go through the assistants in all my workspaces and reply where the brief already covers it'
+  - 'I said use the staging database and skip the flaky suite. If any assistant is asking about that, tell it; anything else ask me'
+  - 'answer my assistants'' pending questions across machines but don''t approve anything for me'
+  - 'Please round up the questions from all my assistants. Reply to what our agreement covers, and show me each remaining one with which machine and project it''s on.'
+  - 'assistants on every host waiting on input: answer within scope, leave approvals to me'
+  - 'find the assistants that asked me something and answer them if my standing rules decide it'
+  - 'Look across the assistants in my local projects and on the remote host, and bring me the choices only I can make'
+  - 'work through what each assistant is asking, one answer each, and tell me which ones went through'
+  - 'answer my assistants for me where it''s obvious from what I said, flag anything risky'
+
+boundaries:
+  - query: 'Go through every assistant on my machines, answer what you can from my notes, and tell me which hosts you couldn''t reach'
+    confusable_with: [daintree.hosts.survey-hosts]
+  - query: 'which assistants are asking me something across hosts, and answer the ones I already decided'
+    confusable_with: [daintree.hosts.survey-hosts]
+  - query: 'not the swarm workers, the project assistants on each machine: answer what''s covered and bring me the rest'
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: 'the assistants in my other projects have questions, reply where our plan says so'
+    confusable_with: [daintree.hosts.supervise-swarm]
+  - query: 'my Daintree Assistants across projects are waiting on answers, handle the ones you can'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: 'answer the questions sitting with my assistants on every project, batch the decisions for me'
+    confusable_with: [daintree.agents.answer-waiting-agent]
+  - query: 'the host assistants already asked me things; reply where I''ve answered before and list the rest'
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: 'respond to what each remote assistant is asking if it''s covered, don''t put any new questions to them'
+    confusable_with: [daintree.hosts.ask-host-assistant]
+  - query: 'skip the catch-up, just clear the questions my assistants are holding where I already gave the answer'
+    confusable_with: [daintree.orchestration.status-and-resume]
