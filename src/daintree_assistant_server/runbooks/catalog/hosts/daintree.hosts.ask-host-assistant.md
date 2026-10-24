@@ -13,7 +13,7 @@ One question to one host; the deliverable is its answer, attributed. Nothing ask
 
 Procedure:
 1. `host.list`: the named host (not `connected`, or `control:false`: report it, stop) and, in its `projects`, the one the question is about. Several hosts or projects fit: ask which.
-2. A fact about that host's state (what runs there, whether an agent finished, which branch or commit a worktree is on, a check's result): read it yourself through `host.call`, no assistant needed: `terminal.getStatus` with `includeOutput:{"lines":50}`, `worktree.list`, at Full a read-only `project.runCommand` (`git log -1`). Relay it as read on that host, with the tool and time, and stop.
+2. A fact about that host's state (what runs there, whether an agent finished, which branch or commit a worktree is on, a check's result): read it yourself through `host.call`, no assistant needed: `terminal.getStatus` with `includeOutput:{"lines":50}`, `worktree.list`, a read-only `project.runCommand` (`git log -1`). Relay it as read on that host, with the tool and time, and stop.
 3. Its assistant's judgment or context ("what does it make of", "how is it going" on work it runs): `assistant.list` through `host.call` there. Several: the one named, else ask. None: say so; a new one has none of that context, so `assistant.start` only if the person wants a fresh view. Not at its prompt (`agentState:"waiting"`, `waitingReason:"prompt"`): working, arm `terminal.notifyWhenIdle` on its `terminalId` through `host.call` and end the turn; stopped on a question or error, report that and stop.
 4. Ask once, its `terminalId` and `generation` from the listing:
 

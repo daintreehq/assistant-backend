@@ -17,7 +17,7 @@ Procedure:
    - `agent.listAvailable`: only CLIs with `availability:"ready"` count (`availabilityComplete:false`: read again shortly). Never guess CLIs.
    - `agent.readQuota`: Codex's windows (`usedPercent`, `resetsAt`); `unavailable` is unknown. Claude Code's usage is never read: unmeasured, not ample.
    - `worktree.list`: branches and PRs it already holds for these pieces.
-   - At Full, `project.runCommand` `git remote get-url origin; uname -sm`. At Core, one read-only agent there answers both first (`waitForReply`), or the placement is provisional until each agent's start check confirms them; say which.
+   - `project.runCommand` `git remote get-url origin; uname -sm`.
 
 ```json tool=host.call
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.readQuota","args":{}}
@@ -28,7 +28,7 @@ Procedure:
 5. Table: piece, host, project, CLI, reason, reading times; gaps apart with what each needs. Start at once only if the request said to; else on their yes ("which machine?" gets the table and stops). A CLI swap or a push they never named is asked either way.
 6. Per piece through `host.call` on its host: `worktree.createWithRecipe` (`newBranch` `<run>/<piece>`, `collisionPolicy:"error"`, `focusPolicy:"preserve"`), `worktree.waitUntilReady` until `ready`, then `agent.launch` in it with that CLI, `name` `<run>: <piece>`, `notify:true`, `handback:true`, `focusPolicy:"preserve"`. Brief: the piece and its acceptance; start with `git fetch origin`, `origin` must be <remote> and the platform <platform> (else stop and say so), `git reset --hard <base SHA>` on this fresh branch; this worktree only; checks by command; push or PR only if the person said; report branch, full SHA, PR URL, each check's command and exit code. Keep per piece `hostId`, `projectId`, `worktreeId`, `worktreePath`, `terminalId`. End the turn.
 
-On notice or resume: a host's notice carries no reply: read `terminal.getStatus` through `host.call` (`includeOutput`), and pieces with no notice the same way, paced to the work. A question in scope: answer with `terminal.sendCommandOwned` there (`notify`, `handback`); else ask the person. Verify each claim: the SHA on the remote by `git ls-remote`, the PR by `gh pr view`; unpushed, at Full `project.runCommand` (`git log -1 --stat`, `git status --porcelain`) in its `worktreePath`. A `disconnected` host keeps its agents running: read again when it is back; placing that piece elsewhere is the person's call, since the first may still finish. A next wave surveys again: readings are not live.
+On notice or resume: a host's notice carries no reply: read `terminal.getStatus` through `host.call` (`includeOutput`), and pieces with no notice the same way, paced to the work. A question in scope: answer with `terminal.sendCommandOwned` there (`notify`, `handback`); else ask the person. Verify each claim: the SHA on the remote by `git ls-remote`, the PR by `gh pr view`; unpushed, `project.runCommand` (`git log -1 --stat`, `git status --porcelain`) in its `worktreePath`. A `disconnected` host keeps its agents running: read again when it is back; placing that piece elsewhere is the person's call, since the first may still finish. A next wave surveys again: readings are not live.
 
 Stop and recovery: one launch per piece, one host per piece. A lost or `expired` launch: `terminal.list` (`owned:true`) there before anything else, never a relaunch on a guess.
 

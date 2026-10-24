@@ -36,7 +36,7 @@ Several hosts: pin both sides as full SHAs on the shared remote (`git ls-remote`
 On notice or resume:
 - A question inside the brief: answer once with `terminal.sendCommandOwned`, `notify:true, handback:true`.
 - The notice's numbers are a claim: report nothing until you have, yourself:
-  1. opened the raw file (a host's: the reply's pairs, or the file by `project.runCommand` at Full), recomputed each side's median, the paired deltas and ratio; checked run counts and alternation;
+  1. opened the raw file (a host's: the reply's pairs, or the file by `project.runCommand`), recomputed each side's median, the paired deltas and ratio; checked run counts and alternation;
   2. re-read both trees' `HEAD` and hash: changed: invalid; a host reports the pinned SHAs and each side's artifact hash;
   3. `terminal.getStatus`: agents that worked during the runs are a caveat; per host, its readings with times beside `host.list` `load` by `sampledAt` (whole machine; null or old is unknown). High or changing load or heat qualifies that host: a verdict only if the whole spread is beyond the threshold;
   4. for a surprising result (large, or opposite), one more round within budget, on that host only (`terminal.sendCommandOwned`, through `host.call` for a host); end the turn.

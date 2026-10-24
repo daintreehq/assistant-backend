@@ -255,14 +255,14 @@ const SURFACES: SurfaceSpec[] = [
     name: "help-core",
     tier: "core",
     description:
-      "Daintree's own sidebar assistant (a help session) in one of this machine's own windows with a project open, Tool set = Core, on a Shell that has added a Remote Host. Help-token bearer, origin 'help' (renderer-owned), pinned to the WebContents that minted it; no approval route. The host-control runtime counts it as one of this machine's assistants in its own view, so host.list and host.call are listed from the session's start, whether or not a host exists yet; it is an assistant caller in its project, so assistant.list, assistant.start and agent.readQuota are listed, at Core as at Full.",
+      "Daintree's own sidebar assistant (a help session) in one of this machine's own windows with a project open, Tool set = Core, on a Shell that has added a Remote Host. Help-token bearer, origin 'help' (renderer-owned), pinned to the WebContents that minted it; no approval route. The host-control runtime counts it as one of this machine's assistants in its own view, so host.list and host.call are listed from the session's start, whether or not a host exists yet; it is an assistant caller in its project, so assistant.list, assistant.start and agent.readQuota are listed, at Core as at Full; as this machine's own assistant it is offered project.runCommand at Core as at Full.",
   },
   {
     ...HELP,
     name: "help-full",
     tier: "full",
     description:
-      "The same sidebar help session with Tool set = Full: adds project.runCommand, and the Full-only window moves host.switch and project.openOnHost, listed because the Shell has added a host.",
+      "The same sidebar help session with Tool set = Full: the Full tier allowlist adds project.runCheck, terminal.new and the rest, and the Full-only window moves host.switch and project.openOnHost, listed because the Shell has added a host.",
   },
   {
     ...HELP,
@@ -326,14 +326,14 @@ const SURFACES: SurfaceSpec[] = [
     name: "relayed-core",
     tier: "core",
     description:
-      "The session a Remote Host opens for a Shell's assistant reaching it through host.call (openRelaySession, #13493), at the calling assistant's Tool set = Core: origin 'external', bound to the one host project the call names, deps.relay set, no approval route, and the relay principal an assistant caller in that project. Listed from a live view of the bound project in which no Remote Host has been added. Never offered a host.* tool or help.displayImage, whatever its tier; gets the owned terminal twins; assistant.list, assistant.start and agent.readQuota by the assistant-caller rule. What host.call can name on a host is this listing.",
+      "The session a Remote Host opens for a Shell's assistant reaching it through host.call (openRelaySession, #13493), at the calling assistant's Tool set = Core: origin 'external', bound to the one host project the call names, deps.relay set, no approval route, and the relay principal an assistant caller in that project. Listed from a live view of the bound project in which no Remote Host has been added. Never offered a host.* tool or help.displayImage, whatever its tier; gets the owned terminal twins; assistant.list, assistant.start and agent.readQuota by the assistant-caller rule, and project.runCommand by the command-runner rule (#13501), held to the drive rule at the call. What host.call can name on a host is this listing.",
   },
   {
     ...RELAYED,
     name: "relayed-full",
     tier: "full",
     description:
-      "The same relayed session at the calling assistant's Tool set = Full: adds project.runCommand (#13501), held to the drive rule at the call.",
+      "The same relayed session at the calling assistant's Tool set = Full: the Full tier allowlist adds project.runCheck, terminal.new and the rest.",
   },
   {
     ...RELAYED,
@@ -369,8 +369,8 @@ function expectedGates(spec: SurfaceSpec) {
     hostCall: spec.helpSession && !spec.relay && spec.hostControlReachable,
     // `mayControlAssistants`: an assistant caller at an in-app tier.
     assistantCaller: spec.assistantCaller !== null && inAppTier,
-    // `mayRunProjectCommand`: Full, and this machine's assistant or a relay.
-    commandRunner: spec.tier === "full" && (spec.origin === "help" || spec.relay),
+    // `mayRunProjectCommand`: an in-app tier, and this machine's assistant or a relay.
+    commandRunner: inAppTier && (spec.origin === "help" || spec.relay),
   };
 }
 
@@ -734,7 +734,7 @@ describe("capture Daintree MCP surfaces", () => {
             : "host control not offered: not one of this machine's help sessions";
         }
         if (id === PROJECT_RUN_COMMAND && !gates.commandRunner) {
-          return "command runner not offered: only this machine's assistant or a relay, at Full";
+          return "command runner not offered: only this machine's assistant or a relay, at an in-app tier";
         }
         if (ASSISTANT_CONTROL_TOOL_IDS.has(id) && !gates.assistantCaller) {
           return "assistant tools not offered: not an assistant caller";

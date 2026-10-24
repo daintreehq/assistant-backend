@@ -2,8 +2,8 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "1006cbca719950c122d995c7b378138a3968aaa2",
-    "app_version": "0.45.0",
+    "app_commit": "1752ef90a46df6152f95a0befde2dca46491e44c",
+    "app_version": "0.46.0",
     "caller_origin": "agent-pane",
     "session_origin": "external",
     "tier": "core",
@@ -26,10 +26,10 @@
       "added_remote_hosts": true,
       "manifest_source": "view"
     },
-    "captured_at": "2026-10-21",
+    "captured_at": "2026-10-24",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "834035d02166f124fccae020090f0ed4bf528bb036fbfad31007bf34813205ac",
+    "surface_hash": "9ca140dab928509efac9e7ee5526ee1dba65348c82ea9855be587d3b8657f990",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest and session policy)",
     "tool_count": 79,
     "context_gated_tools": [
@@ -421,14 +421,15 @@
                   "panel-limit",
                   "already-launching",
                   "spawn-failed",
-                  "unavailable"
+                  "unavailable",
+                  "host-memory"
                 ]
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Null on a launch, else why not: panel-limit (see panelLimit), already-launching (retry), missing-cli (setup panel opened)."
+            "description": "Null if launched. panel-limit: see panelLimit; already-launching, host-memory: retry; missing-cli: setup opened."
           },
           "worktreeId": {
             "type": [
@@ -4074,7 +4075,7 @@
     {
       "action_id": "slashCommands.list",
       "wire_name": "slashCommands.list",
-      "description": "List the slash commands an agent CLI offers, including project-local ones, before driving the agent with one. An empty list means it has none; a project that is not open fails.",
+      "description": "List the slash commands an agent CLI offers, including project-local ones, before driving the agent with one. An empty list means it has none.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4402,7 +4403,7 @@
                   "type": "number"
                 },
                 "lastTypedInputAt": {
-                  "description": "Epoch ms of the last raw PTY input (keys, paste, broadcast; not sends). Before `lastTransitionAt` means none since. Not proof of delivery or authorship.",
+                  "description": "Epoch ms of last PTY input (keys, paste, broadcast, withdrawn sends). Before `lastTransitionAt` means none since. Not proof of delivery or authorship.",
                   "type": "number"
                 },
                 "exitCode": {
@@ -4820,6 +4821,46 @@
                       "type": "null"
                     }
                   ]
+                },
+                "restored": {
+                  "type": "object",
+                  "properties": {
+                    "at": {
+                      "type": "number"
+                    },
+                    "disposition": {
+                      "type": "string",
+                      "enum": [
+                        "resume",
+                        "fresh",
+                        "held"
+                      ]
+                    },
+                    "heldReason": {
+                      "type": "string"
+                    },
+                    "lastSeen": {
+                      "type": "object",
+                      "properties": {
+                        "agentState": {
+                          "type": "string"
+                        },
+                        "at": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "agentState"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "at",
+                    "disposition"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Set when restore rebuilt the pane (`at`, epoch ms). lastSeen: agent state saved before then, not proof a run ended."
                 }
               },
               "required": [
@@ -6361,6 +6402,13 @@
                 },
                 "hasLiveView": {
                   "type": "boolean"
+                },
+                "frontendAttached": {
+                  "description": "A frontend is attached: a view here or a driving Shell. If false, only tools the host runs itself run. Null: unknown.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -6368,7 +6416,8 @@
                 "path",
                 "name",
                 "kind",
-                "hasLiveView"
+                "hasLiveView",
+                "frontendAttached"
               ],
               "additionalProperties": false
             }
@@ -6765,6 +6814,9 @@
                       "type": "string"
                     },
                     "additionalProperties": {}
+                  },
+                  "ssh": {
+                    "type": "string"
                   },
                   "provider": {
                     "type": "string"
@@ -7250,6 +7302,36 @@
               "additionalProperties": false
             }
           },
+          "pluginChecks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": [
+                    "warning",
+                    "info"
+                  ]
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "pluginId",
+                "label",
+                "severity"
+              ],
+              "additionalProperties": false
+            }
+          },
           "counts": {
             "type": "object",
             "properties": {
@@ -7379,6 +7461,7 @@
           "warnings",
           "infos",
           "nextActions",
+          "pluginChecks",
           "counts",
           "aheadCount",
           "behindCount",
@@ -7637,7 +7720,7 @@
     {
       "action_id": "worktree.waitUntilReady",
       "wire_name": "worktree.waitUntilReady",
-      "description": "Wait for a worktree's post-create setup (config copy, submodules, setup script, provisioning) and report where it got. Setup can outlive creation, so work started earlier may see an unpopulated tree. A zero timeout reads without blocking; running out of time is not a failure.",
+      "description": "Wait for a worktree's post-create setup (config copy, submodules, setup script, provisioning, plugin steps) and report where it got. Setup can outlive creation, so earlier work may see an unpopulated tree. A zero timeout reads without blocking; timing out is not a failure.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7674,7 +7757,7 @@
               "needs-approval",
               "unknown"
             ],
-            "description": "pending, running (config copy, submodules, setup script or provisioning), ready, failed, timed-out, needs-approval (repo setup commands await the user's approval; you can't give it), or unknown (not created by this host, or it restarted since)."
+            "description": "pending, running (config copy, submodules, setup script, provisioning, plugin steps), ready, failed, timed-out, needs-approval (awaits the user's approval; you can't give it), or unknown (not created by this host, or it restarted since)."
           },
           "stage": {
             "anyOf": [
@@ -7683,7 +7766,8 @@
                 "enum": [
                   "copy-config",
                   "submodules",
-                  "setup-script"
+                  "setup-script",
+                  "plugin-steps"
                 ]
               },
               {

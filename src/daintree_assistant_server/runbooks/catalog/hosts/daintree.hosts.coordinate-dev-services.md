@@ -26,16 +26,16 @@ Procedure:
    The brief: HEAD must be <SHA>, else stop and report; verified addresses in untracked dev config only; invented data in its own local database; no copied credential; never a shared, staging or production endpoint or database; start <command> in a Daintree terminal of its own (`terminal.new`), bound to loopback or the one named address, and leave it running; reply with the SHA served, the bind (address, port, PID), that terminal's id, and one readiness request with its result. End the turn.
 
 On notice or resume:
-- A reply without that evidence is a blocker, not ready. Readiness from the service's own host, at Tool set Full one bounded request there:
+- A reply without that evidence is a blocker, not ready. Readiness from the service's own host, one bounded request there:
 
-```json tool=host.call surface=help-full
+```json tool=host.call surface=help-core
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"project.runCommand","args":{"projectId":"<projectId>","command":"curl -sS --max-time 5 -o /dev/null -w '%{http_code}' http://localhost:<port>/<path>","timeoutMs":15000}}
 ```
 
-  At Core the agent's request is a claim. An edge across hosts is checked the same way from the caller's host, to the callee's address.
+  An edge across hosts is checked the same way from the caller's host, to the callee's address.
 - All ready: from the caller's host one request through its service to the callee with header `X-Dev-Marker: <run>-<sha>`, its status and body; the callee's log must show the marker answered 2xx (`terminal.getOutput` there on its service terminal, or its agent reads the log). Compatible: the body carries the callee's SHA, the log agrees, the SHAs are the pins. Else unverified.
 - A question within scope: answer once with `terminal.sendCommandOwned` there, `notify:true, handback:true`; a new endpoint, credential or shared database is the person's.
 
-Stop and recovery: one agent and one start per service; before any launch, `terminal.list` there. A rebind or new SHA: its agent stops the old listener and shows it gone before restarting. Stop only on request, callers first: each agent stops its service and reports the listener gone (at Full, `lsof -nP -iTCP:<port> -sTCP:LISTEN` there by `project.runCommand` confirms).
+Stop and recovery: one agent and one start per service; before any launch, `terminal.list` there. A rebind or new SHA: its agent stops the old listener and shows it gone before restarting. Stop only on request, callers first: each agent stops its service and reports the listener gone (`lsof -nP -iTCP:<port> -sTCP:LISTEN` there by `project.runCommand` confirms).
 
 Report back: per service its host, SHA pinned vs served, listener, terminal and who stops it; per edge the caller, address, and from which machine it was verified; readiness and end-to-end apart; blocked edges.

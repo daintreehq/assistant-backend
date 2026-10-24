@@ -19,7 +19,7 @@ optionalTools:
 ---
 A published version is permanent. An agent prepares and inspects the release files; you verify them, run the one publish visibly, the user typing their own OTP, then prove it from the registry.
 
-Across hosts, one designated host per package and channel publishes (the person names it, else ask); the others only build and inspect, read-only (daintree.hosts.run-validation-matrix). Pin a full SHA from the shared remote (`git ls-remote`). Step 1's account preflight (Core: the agent's first check) through step 6 are the publisher's, each through `host.call` there as the hosts foundation says; step 5's terminal opens there (`terminal.new`: Full only, else the person runs the command there). Registry reads and the clean consumer stay in your shell. Keep a line per package and channel: host, SHA.
+Across hosts, one designated host per package and channel publishes (the person names it, else ask); the others only build and inspect, read-only (daintree.hosts.run-validation-matrix). Pin a full SHA from the shared remote (`git ls-remote`). Step 1's account preflight through step 6 are the publisher's, each through `host.call` there as the hosts foundation says; step 5's terminal opens there (`terminal.new`: Full only, else the person runs the command there). Registry reads and the clean consumer stay in your shell. Keep a line per package and channel: host, SHA.
 
 On a host: shell steps run there (its accounts, not yours), per the hosts foundation; own shell: `gh -R <repo>`.
 

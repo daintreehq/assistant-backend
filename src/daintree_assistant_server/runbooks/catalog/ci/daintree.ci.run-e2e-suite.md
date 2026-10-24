@@ -17,7 +17,7 @@ optionalTools:
 ---
 The trap is a green run against the wrong code: `localhost:3000` is often another checkout's server, or this one's stale build. A visible agent in the worktree starts what it needs and runs the suite; you preflight and check its evidence.
 
-On a host: each step through `host.call`; your shell reads (`git`, `lsof`, reports) by `project.runCommand` there at Full, else the agent quotes them, unproven.
+On a host: each step through `host.call`; your shell reads (`git`, `lsof`, reports) by `project.runCommand` there.
 
 1. Worktree id and path from `worktree.list`; `worktree.waitUntilReady` until `ready` (`timedOut:true`: again, for a few minutes; `failed`, `timed-out`, `needs-approval`: stop and report; `unknown`: dependencies unverified). Record `HEAD` and, if dirty, a hash of `git diff HEAD` plus untracked source files (not build output). An agent `working` there (`terminal.getStatus`): ask first.
 2. Read the e2e config there (`playwright.config.*`, `cypress.config.*`): base URL, port, whether the runner starts the server, `reuseExistingServer` (it silently tests whatever listens), how the app shows its build (version route, stamp, header). Note where the runner, browser and server each run: a host's `localhost` is not the Shell's, and a Shell forward may use another local port. Server evidence comes from its machine; through a forward, the browser's machine also checks the marker via that URL.

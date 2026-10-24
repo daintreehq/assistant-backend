@@ -12,13 +12,13 @@ hostEligibility: connected
 Procedure:
 1. Rows: one per environment asked for (platform, architecture, runtime versions, checks); another agent CLI is not another row. Pin in your shell the remote URL, the full SHA (`git ls-remote`; a tag's commit) and a run id. Checks are exact commands, the same for every row: the person's, else the repository's CI checks, read from its CI config in your shell and written out once. Keep a row queue: row id, environment, host, state.
 2. Candidates: connected in `host.list` with `control` and the repository's project in `projects`.
-3. Survey each candidate once through `host.call` in that project, installing nothing: `uname -sm`, each requested runtime's version, `git remote get-url origin`. At Full, `project.runCommand`; at Core, `agent.launch` there with `waitForReply:true`, `handback:true`, told to run exactly those commands, change nothing and quote the output, then `terminal.closeOwned` it.
+3. Survey each candidate once through `host.call` in that project, installing nothing: `uname -sm`, each requested runtime's version, `git remote get-url origin`, by `project.runCommand`.
 4. Place each row on a host whose answer meets it, `origin` matching, spread across hosts; none: `unavailable`, with why. Never substitute a near version or platform.
 5. Per host one row at a time, through `host.call`: `worktree.createWithRecipe` (`newBranch` `<run>/<row>`, `collisionPolicy:"error"`, `focusPolicy:"preserve"`), `worktree.waitUntilReady` until `ready`; in its `worktreePath` pin `git fetch origin && git checkout --detach <SHA>` first, then the checks, never pushed.
-   - Full, drive it yourself: `project.runCommand` in the `worktreePath` (or `project.runCheck` with a runner from `project.detectRunners` that runs exactly that command), `timeoutMs` the person's cap; before and after, `git rev-parse HEAD; git status --porcelain` and the environment line.
-   - Core, or a check that needs judgment (a browser-driven step, a flaky test to tell from a failure): `agent.launch` in that worktree with `notify:true`, `handback:true`. Brief: the pin, then exactly these commands; no edits, installs, fixes or pushes; ports and databases only this worktree's; report HEAD before and after, `git status --porcelain`, platform, architecture and runtime, per command test counts or exit code, failing tests by name, log path, and what could not run and why. End the turn.
+   - Drive it yourself: `project.runCommand` in the `worktreePath` (or, at Full, `project.runCheck` with a runner from `project.detectRunners` that runs exactly that command), `timeoutMs` the person's cap; before and after, `git rev-parse HEAD; git status --porcelain` and the environment line.
+   - A check that needs judgment (a browser-driven step, a flaky test to tell from a failure): `agent.launch` in that worktree with `notify:true`, `handback:true`. Brief: the pin, then exactly these commands; no edits, installs, fixes or pushes; ports and databases only this worktree's; report HEAD before and after, `git status --porcelain`, platform, architecture and runtime, per command test counts or exit code, failing tests by name, log path, and what could not run and why. End the turn.
 
-```json tool=host.call surface=help-full
+```json tool=host.call surface=help-core
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"project.runCommand","args":{"projectId":"<projectId>","command":"<check command>","cwd":"<worktreePath>","timeoutMs":1800000}}
 ```
 

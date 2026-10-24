@@ -14,7 +14,7 @@ The plan is yours: kept in this conversation and, for a run spanning sessions, i
 Procedure:
 1. Plan, per unit: id; host and project holding its repository (`host.list`); that repository's base branch at full SHA; `dependsOn`; its inputs from each predecessor (repository, branch, SHA; another project's contract also by path and version); acceptance; allowed writes; branch `<run>/<unit>`. Ids unique, dependencies known, no cycle; two predecessors in one repository need an integration unit (daintree.hosts.integrate-host-branches). Units push their branches: without the person's push authority, ask. Show the table before launching unless told to go.
 2. Ready: every predecessor done, its exact SHA on the remote the dependent fetches (`git ls-remote`, PR head); unpushed feeds no host.
-3. Per ready unit, mark it `launching` with the time, then on its host (holding the base SHA first: `git fetch origin <branch>` then `git cat-file -e <SHA>^{commit}` there, by `project.runCommand` at Full or an agent at Core) a worktree on `<run>/<unit>` from that SHA (`worktree.createWithRecipe`, `collisionPolicy:"error"`, then `worktree.waitUntilReady` with its `worktreeId`) and one agent there; record the returned ids and mark it `running`:
+3. Per ready unit, mark it `launching` with the time, then on its host (holding the base SHA first: `git fetch origin <branch>` then `git cat-file -e <SHA>^{commit}` there, by `project.runCommand`) a worktree on `<run>/<unit>` from that SHA (`worktree.createWithRecipe`, `collisionPolicy:"error"`, then `worktree.waitUntilReady` with its `worktreeId`) and one agent there; record the returned ids and mark it `running`:
 
 ```json tool=host.call
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.launch","args":{"agentId":"claude","name":"<run>: <unit>","worktreeId":"<worktreeId>","prompt":"<brief>","notify":true,"handback":true}}
@@ -24,7 +24,7 @@ Procedure:
 
 On notice or resume:
 - `launching` with no terminal id (an outcome you never saw): `terminal.list` there for its name, `worktree.list` for its branch; adopt what exists, launch only what is proven absent.
-- Finished is a claim: its SHA on `<run>/<unit>` (`git ls-remote`); `git diff --stat <base>...<SHA>` in a scratch clone, within its allowed writes; its acceptance checks at that SHA on its host (`project.runCheck` or `project.runCommand` there, `cwd` its worktree, at Tool set Full; at Core the agent's exit codes stay claims). Done, with the SHA and how it was checked. A failed check, an error, or a refusal there: failed, its dependents blocked and shown.
+- Finished is a claim: its SHA on `<run>/<unit>` (`git ls-remote`); `git diff --stat <base>...<SHA>` in a scratch clone, within its allowed writes; its acceptance checks at that SHA on its host (`project.runCommand` there, or `project.runCheck` at Full, `cwd` its worktree). Done, with the SHA and how it was checked. A failed check, an error, or a refusal there: failed, its dependents blocked and shown.
 - A question within scope: answer once with `terminal.sendCommandOwned` there, `notify:true, handback:true`; otherwise ask the person.
 - Then steps 2-3, input SHAs re-read.
 - Plan lost, conversation and checkpoint: launch nothing until the person restores it; then reconcile each unit by its `<run>/<unit>` branch and, on its host, its terminal by name.
