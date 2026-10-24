@@ -58,12 +58,22 @@ maintainers wrote the traps into it.
   calls do not chain.
 - `external`: an API-key client. It gets a curated subset, and **no `notify`** on
   `agent.launch` or the send, and no `terminal.notifyWhenIdle`.
+- `global-core` / `global-full`: the installation's one projectless Daintree
+  Assistant. It calls only `host.list`, `host.call` and `host.settings`; every project,
+  this machine's under `hostId` `local`, is reached through `host.call`, under an
+  allow-list: owned tools as written (no translation to the unscoped ones), no
+  command runner, no session resume. Its checkpoints persist in
+  `$DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR`.
 
 **Which caller a runbook is checked against** is decided by its id namespace,
 never by its tool lists (`CALLER_POLICY` in `tests/daintree_mcp_surfaces.py`).
 Every runbook is followed from an agent pane, so its `requiredTools` must be on
 `pane-core`, except `daintree.hosts.*`: sidebar-only by design, its whole
-baseline must be on ONE of `help-core` or `help-full`. A pane runbook with a host
+baseline must be on ONE of `help-core` or `help-full`; and `daintree.assistants.*`:
+assistant-only by design, its whole baseline, foundation included, on ONE of
+`global-core`, `global-full`, `help-core` or `help-full`, where a global caller
+counts what its `host.call` reaches. Untagged examples there resolve on the global
+caller first, so a project step is written inside `host.call`. A pane runbook with a host
 branch lists `host.list`/`host.call` in `optionalTools`, never `requiredTools`, and
 tags that branch's examples `surface=help-core`. A `host.call` example is validated
 twice: the call against the help surface, and its `tool` and `args` against the
@@ -199,7 +209,7 @@ It gets no empty notice or checkpoint sections.
 | `whenToUse` | yes | the routing text above |
 | `foundation` | no | `true` for a domain's base-judgment runbook |
 | `risk` | no | `read local ui terminal project external git system`, descriptive only, not a permission |
-| `requiredTools` | no | app action ids the baseline path calls; must be on the caller's surface (`pane-core`; `help-core` or `help-full` for `daintree.hosts.*`) |
+| `requiredTools` | no | app action ids the baseline path calls; must be on the caller's surface (`pane-core`; `help-core` or `help-full` for `daintree.hosts.*`; a global or project Assistant for `daintree.assistants.*`) |
 | `optionalTools` | no | app action ids a conditional branch, caller variant or enhancement calls |
 | `requires` | no | other runbook ids whose instructions must be read first |
 | `hostEligibility` | `daintree.hosts.*` only, and required there | the caller host state it fits: `connected`, `configured` or `any` ([MCP.md](MCP.md#host-model-and-host-state)); search leaves it out for a caller whose reported state does not fit |

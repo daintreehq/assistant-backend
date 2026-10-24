@@ -8,7 +8,7 @@
 # workspace packages are re-pointed at the worktree's packages/), copies
 # captureMcpSurfaces.test.ts into it, runs that one vitest file, writes one
 # whole <surface>.json per caller (pane-core, pane-full, help-core, help-full,
-# external, relayed-core, relayed-full), then runs the app's own tests of the
+# external, relayed-core, relayed-full, global-core, global-full), then runs the app's own tests of the
 # direct host-control contract at the same commit, and removes the worktree.
 #
 # Nothing is written into the app checkout itself: the worktree has a real

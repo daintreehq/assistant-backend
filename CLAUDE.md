@@ -173,7 +173,7 @@ by `RunbookMeta` in `runbooks/models.py` (`extra="forbid"` — unknown keys are 
 | `whenToUse` | yes | the *primary* routing signal (→ `when_to_use`) |
 | `foundation` | no | `true` marks a domain foundation (base judgment for a dotted namespace) |
 | `risk` | no | enum `read local ui terminal project external git system` — descriptive only |
-| `requiredTools` | no | Daintree app MCP action ids the baseline path calls; must be on the caller's surface: `pane-core`, or for `daintree.hosts.*` one of `help-core`/`help-full` (`CALLER_POLICY`) (→ `required_tools`) |
+| `requiredTools` | no | Daintree app MCP action ids the baseline path calls; must be on the caller's surface: `pane-core`, or for `daintree.hosts.*` one of `help-core`/`help-full`, or for `daintree.assistants.*` one of `global-core`/`global-full`/`help-core`/`help-full` (`CALLER_POLICY`) (→ `required_tools`) |
 | `optionalTools` | no | action ids a conditional branch or caller variant calls (→ `optional_tools`); never also required |
 | `requires` | no | other runbook ids whose instructions must be read first; validated for existence, visibility and cycles (the implicit foundation edge included), and delivered as `supporting_runbooks` |
 | `hostEligibility` | `daintree.hosts.*` only, required there | `connected` `configured` `any`: the caller host state (`Daintree-Hosts`; `runbooks/host_state.py`) the runbook fits; search excludes it before the shortlist when the reported state does not fit, and an unreported caller is offered everything |
@@ -188,7 +188,8 @@ per session), and a caller that prints the whole result pays for both the text b
 **Runbooks name Daintree app MCP actions**, and `tests/fixtures/daintree_mcp/` is the
 authority on which exist and what each caller is offered: an agent pane (owned tools such as
 `terminal.sendCommandOwned`), the sidebar assistant (the unscoped `terminal.sendCommand`, and
-alone `host.list`/`host.call`), what a Remote Host offers inside `host.call` (the relayed
+alone `host.list`/`host.call`), the projectless global Assistant (root tools only; every project
+through `host.call`, under an allow-list), what a Remote Host offers inside `host.call` (the relayed
 surface: owned tools, no `host.*`), and an API-key client (no `notify`, no
 `terminal.notifyWhenIdle`). A `host.call` example is validated against both the call's surface
 and the relayed one of the same tier. The hygiene test checks

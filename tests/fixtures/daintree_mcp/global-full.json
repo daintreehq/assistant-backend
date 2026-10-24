@@ -1,0 +1,518 @@
+{
+  "capture": {
+    "app_repo": "daintreehq/daintree",
+    "app_branch": "develop",
+    "app_commit": "1752ef90a46df6152f95a0befde2dca46491e44c",
+    "app_version": "0.46.0",
+    "caller_origin": "global",
+    "session_origin": "help",
+    "tier": "full",
+    "session": {
+      "workspace_bound": false,
+      "pane_approval": false,
+      "renderer_owned_origin": true,
+      "relay": false
+    },
+    "caller": "The same global assistant with Tool set = Full.",
+    "host_control": {
+      "help_session": true,
+      "call_reachable": true,
+      "host_tools_offered": true,
+      "assistant_caller": "local",
+      "assistant_tools_offered": true,
+      "command_runner_offered": true
+    },
+    "machine": {
+      "added_remote_hosts": true,
+      "manifest_source": "viewless-help"
+    },
+    "captured_at": "2026-10-24",
+    "mcp_protocol_version": "2025-11-25",
+    "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
+    "surface_hash": "baf5980b97f1e1fb8d635da5ab5c3c0da17a2a94b8d5bef86b56fe1654f019e9",
+    "surface_hash_method": "buildSurfaceManifest(manifest, tier, appVersion, sessionPolicy) — the function the mcp.surface handler calls with the same inputs; the real tools/call was refused in the capture harness: {\"content\":[{\"type\":\"text\",\"text\":\"{\\\"code\\\":\\\"NO_FRONTEND_ATTACHED\\\",\\\"message\\\":\\\"The global assistant has no project of its own, so it reaches projects only through host.call. Nothing was run.\\\",\\\"retriable\\\":true}\"}],\"isError\":true}",
+    "tool_count": 0,
+    "allowlisted_but_not_listed": [
+      {
+        "action_id": "actions.getContext",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "actions.getSchema",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "actions.list",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "actions.search",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "agent.launch",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "agent.launchMany",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "agent.listAvailable",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "agent.listModels",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "agent.listPresets",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "agent.readQuota",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "agentSessionHistory.list",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "agentSessionHistory.resume",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "assistant.list",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "assistant.start",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "browser.getConsoleMessages",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "copyTree.generate",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "copyTree.generateAndCopyFile",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "copyTree.injectToTerminal",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "devPreview.reloadPreview",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "devPreview.restart",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "diagnostics.openReview",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "errors.recent",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "fleet.getRunStatus",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "forge.getCIStatus",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "forge.getIssue",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "forge.getPR",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "forge.listIssues",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "forge.listPRs",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "git.getProjectPulse",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "help.displayImage",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "host.call",
+        "reason": "absent from the viewless help base manifest this session is listed from"
+      },
+      {
+        "action_id": "host.ensureProject",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "host.list",
+        "reason": "absent from the viewless help base manifest this session is listed from"
+      },
+      {
+        "action_id": "host.settings",
+        "reason": "absent from the viewless help base manifest this session is listed from"
+      },
+      {
+        "action_id": "host.switch",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "mcp.surface",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "notifications.recent",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "plugin.capturePanel",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "plugin.diagnostics",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "plugin.reloadPanel",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "plugin.reloadProject",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "plugin.validate",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "project.detectRunners",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "project.openOnHost",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "project.runCheck",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "project.runCommand",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "recipe.list",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "recipe.run",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "skills.load",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "skills.search",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "slashCommands.list",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.close",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.closeAll",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.closeMany",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.getOutput",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.getStatus",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.inject",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.interruptOwned",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.kill",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.list",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.moveToWorktree",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.new",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.notifyWhenIdle",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.placeOwned",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.readLastMessageOwned",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.rename",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.restart",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.revealOwned",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.sendCommand",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.sendCommandMany",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.sendKeys",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.setClientMetadata",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.waitUntilIdle",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "terminal.waitUntilIdleBatch",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "workflow.prepBranchForReview",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "workflow.startWorkOnIssue",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "workspace.list",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.createWithRecipe",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.delete",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.deleteOwned",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.getCurrent",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.list",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.resource.pause",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.resource.provision",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.resource.resume",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.resource.status",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.resource.teardown",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.reviewReadiness",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.setActive",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.setCustomTitle",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.setLabelColor",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.waitForPullRequest",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
+        "action_id": "worktree.waitUntilReady",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      }
+    ],
+    "root_tools": [
+      "host.call",
+      "host.list",
+      "host.settings"
+    ],
+    "root_tools_listed": [],
+    "host_call": {
+      "admits": [
+        "actions.getContext",
+        "actions.getSchema",
+        "actions.list",
+        "actions.search",
+        "agent.launch",
+        "agent.launchMany",
+        "agent.listAvailable",
+        "agent.listModels",
+        "agent.listPresets",
+        "agent.readQuota",
+        "agentSessionHistory.list",
+        "assistant.list",
+        "assistant.start",
+        "browser.getConsoleMessages",
+        "copyTree.generate",
+        "errors.recent",
+        "fleet.getRunStatus",
+        "forge.getCIStatus",
+        "forge.getIssue",
+        "forge.getPR",
+        "forge.listIssues",
+        "forge.listPRs",
+        "git.getProjectPulse",
+        "mcp.surface",
+        "notifications.recent",
+        "plugin.capturePanel",
+        "plugin.diagnostics",
+        "plugin.validate",
+        "project.detectRunners",
+        "recipe.list",
+        "recipe.run",
+        "skills.load",
+        "skills.search",
+        "slashCommands.list",
+        "terminal.closeMany",
+        "terminal.closeOwned",
+        "terminal.getOutput",
+        "terminal.getStatus",
+        "terminal.injectOwned",
+        "terminal.interruptOwned",
+        "terminal.list",
+        "terminal.new",
+        "terminal.notifyWhenIdle",
+        "terminal.placeOwned",
+        "terminal.readLastMessageOwned",
+        "terminal.revealOwned",
+        "terminal.sendCommandMany",
+        "terminal.sendCommandOwned",
+        "terminal.sendKeysOwned",
+        "terminal.waitUntilIdle",
+        "terminal.waitUntilIdleBatch",
+        "workflow.prepBranchForReview",
+        "workflow.startWorkOnIssue",
+        "workspace.list",
+        "worktree.createWithRecipe",
+        "worktree.deleteOwned",
+        "worktree.getCurrent",
+        "worktree.list",
+        "worktree.resource.status",
+        "worktree.resource.teardown",
+        "worktree.reviewReadiness",
+        "worktree.waitForPullRequest",
+        "worktree.waitUntilReady"
+      ],
+      "withheld": [
+        "agentSessionHistory.resume",
+        "copyTree.generateAndCopyFile",
+        "copyTree.injectToTerminal",
+        "devPreview.reloadPreview",
+        "devPreview.restart",
+        "diagnostics.openReview",
+        "plugin.reloadPanel",
+        "plugin.reloadProject",
+        "project.openOnHost",
+        "project.runCheck",
+        "project.runCommand",
+        "terminal.close",
+        "terminal.closeAll",
+        "terminal.inject",
+        "terminal.kill",
+        "terminal.moveToWorktree",
+        "terminal.rename",
+        "terminal.restart",
+        "terminal.sendCommand",
+        "terminal.sendKeys",
+        "terminal.setClientMetadata",
+        "worktree.delete",
+        "worktree.resource.pause",
+        "worktree.resource.provision",
+        "worktree.resource.resume",
+        "worktree.setActive",
+        "worktree.setCustomTitle",
+        "worktree.setLabelColor"
+      ],
+      "method": "GLOBAL_ALLOWED_TOOLS and GLOBAL_WITHHELD_TOOLS imported from electron/remote/assistant/HostCallRuntime.ts at this commit. What a call can name is the relayed surface of the same Tool set narrowed to `admits`: the host still applies its tier, ownership and drive rule."
+    },
+    "notes": [
+      "Root tools the dispatch guard admits but tools/list does not carry: host.call, host.list, host.settings. They are absent from the viewless help base manifest (generated mcpExternalBaseManifest + mcpViewlessBaseManifest) this session is listed from, so a client that calls only listed tools cannot reach them at this commit."
+    ]
+  },
+  "tools": []
+}
