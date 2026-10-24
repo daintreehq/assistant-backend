@@ -1,0 +1,130 @@
+# Authorised continuation: work the user already approved keeps moving under the runbook that
+# executes it, proved by checks on the exact candidate rather than a compulsory reviewer, with a
+# bounded corrective round inside the original scope. Recall cases: continuing an approved plan,
+# resuming one after a restart or a missed notice, waves whose agents fix their own red checks,
+# and a remote swarm kept moving with one retry. Traps, by deliverable: a status-only sweep and a
+# read-only final report stay read-only; a verification judges one claim; a requested reviewer
+# loop keeps its own owner, which bounds its own fixes. Each forbids the execution owner it could
+# be confused with.
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: continuation-approved-plan-decisions-only
+    category: single-runbook
+    note: >-
+      The issue's request. Decided by execute-durable-workflow's "track this plan and resume it
+      later"; status-and-resume reconciles and hands continuing back to the executing runbook.
+    messages:
+      - role: user
+        content: Continue the plan I already approved and bring me only the decisions you need.
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+
+  - id: continuation-approved-plan-no-reviewer
+    category: single-runbook
+    note: >-
+      Approved plan, acceptance by tests rather than a reviewer agent. The execution owner, not
+      verify-agent-work (one claim judged) or review-until-approved (a requested reviewer loop).
+    messages:
+      - role: user
+        content: the plan is approved, keep running it; prove each step with the tests, not a reviewer agent
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+
+  - id: continuation-resume-after-restart-no-new-go
+    category: single-runbook
+    note: >-
+      Resume after a restart without asking again. Decided by "must survive turns, restarts or
+      asynchronous waits"; continuing is the executing runbook's, not the status sweep's.
+    messages:
+      - role: user
+        content: Resume the approved multi-step plan after the restart and keep dispatching ready nodes without asking me again
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+
+  - id: continuation-waves-agents-fix-own-ci
+    category: single-runbook
+    note: >-
+      Waves whose agents fix their own failing CI, with no review stage. work-in-waves owns the
+      per-wave CI gate and "who fixes failing CI"; ci.diagnose-and-fix is one failure, not a run.
+    messages:
+      - role: user
+        content: run the issue waves and let the agents fix their own failing CI without a code review stage
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+
+  - id: continuation-swarm-retry-once-decisions-only
+    category: single-runbook
+    note: >-
+      Remote work already out, kept moving with one corrective retry. Decided by supervise-swarm's
+      "the run kept moving" and "decisions brought to the person".
+    messages:
+      - role: user
+        content: keep the swarm on my remote hosts moving, retry a failed check once and tell me only when something needs my decision
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: continuation-cross-host-plan-no-new-go
+    category: single-runbook
+    note: >-
+      An approved dependent plan across hosts, continued stage by stage without a fresh go.
+      execute-distributed-workflow carries the graph; supervise-swarm follows work already out.
+    messages:
+      - role: user
+        content: carry on with the approved dependency plan across my hosts; no need to ask me again for each stage
+    expect:
+      required: [daintree.hosts.execute-distributed-workflow]
+      optional: [daintree.hosts.foundation]
+
+  # -------------------------------------------------------------- routing traps
+  - id: continuation-not-durable-status-only
+    category: routing-trap
+    note: >-
+      Status only: no continuing and no fixes. status-and-resume reads and reconciles;
+      execute-durable-workflow fences "a status-only where were we sweep", and its procedure
+      (dispatching ready nodes) is not the deliverable here.
+    messages:
+      - role: user
+        content: what is still in flight from the plan, I only want the status, no fixes
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      forbid: [daintree.orchestration.execute-durable-workflow]
+
+  - id: continuation-not-execution-verify-only
+    category: routing-trap
+    note: >-
+      Verification only. verify-agent-work judges one claim and repairs nothing; neither the
+      fix loop nor a reviewer loop rides along.
+    messages:
+      - role: user
+        content: did the agent really finish what I asked? check it against the criteria but leave the code alone
+    expect:
+      required: [daintree.orchestration.verify-agent-work]
+      forbid: [daintree.ci.diagnose-and-fix, daintree.orchestration.review-until-approved]
+
+  - id: continuation-not-execution-reviewer-loop
+    category: routing-trap
+    note: >-
+      A requested reviewer loop stays available: review-until-approved owns it, and dropping
+      the compulsory reviewer from execution must not take this request from it.
+    messages:
+      - role: user
+        content: have a reviewer agent go over the agent's change until it approves
+    expect:
+      required: [daintree.orchestration.review-until-approved]
+      forbid: [daintree.orchestration.verify-agent-work]
+
+  - id: continuation-not-distributed-read-only-report
+    category: routing-trap
+    note: >-
+      A read-only account of what the hosts delivered, with no repair or merge. supervise-swarm's
+      final report is read-only; execute-distributed-workflow carries a plan forward and is not
+      the deliverable.
+    messages:
+      - role: user
+        content: which machines really delivered and which only said so, don't fix or merge anything
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+      forbid: [daintree.hosts.execute-distributed-workflow]

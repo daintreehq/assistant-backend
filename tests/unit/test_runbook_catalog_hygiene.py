@@ -23,10 +23,13 @@ import re
 import pytest
 from daintree_mcp_surfaces import (
     CALLER_POLICY_BY_MODEL,
+    GLOBAL_SURFACES,
+    GLOBAL_TIER_SURFACE,
     HOST_CONTROL_TOOLS,
     MESSAGING_TOOLS,
     MODELS,
     PANE_CALLERS,
+    RELAYED_SURFACE,
     SURFACES_BY_MODEL,
     Model,
     action_ids,
@@ -34,6 +37,7 @@ from daintree_mcp_surfaces import (
     baseline_violation,
     capture,
     known_action_ids,
+    listed_action_ids,
     rebuild_delta,
 )
 
@@ -122,22 +126,37 @@ def test_supporting_runbooks_run_on_the_same_caller(model: Model) -> None:
     assert baseline_violation("daintree.release.example", ["terminal.list", "host.list"])
 
 
-def test_the_caller_policy_names_one_sidebar_only_domain() -> None:
-    """Pinned, so widening who escapes the pane check is a deliberate edit here."""
+def test_the_caller_policy_names_its_two_assistant_only_domains() -> None:
+    """Pinned, so widening who escapes the pane check is a deliberate edit here: the
+    hosts domain is the Shell assistant's, and the assistants domain is Daintree's own
+    assistant's, the global one first."""
     assert PANE_CALLERS == ("pane-core",)
     assert CALLER_POLICY_BY_MODEL == {
-        "control": {"daintree.hosts": ("help-core", "help-full")},
+        "control": {
+            "daintree.hosts": ("help-core", "help-full"),
+            "daintree.assistants": ("global-core", "global-full", "help-core", "help-full"),
+        },
     }
 
 
 @pytest.mark.parametrize("model", MODELS)
 def test_every_other_runbook_is_still_checked_against_the_pane(model: Model) -> None:
     """The policy exempts nothing it does not name: every runbook outside
-    `daintree.hosts` keeps the pane check, whatever tools it declares."""
+    `daintree.hosts` and `daintree.assistants` keeps the pane check, whatever tools it
+    declares."""
     catalog = _catalog(model)
     off_pane = [rid for rid in catalog.known_ids if baseline_callers(rid, model) != PANE_CALLERS]
-    assert all(rid.startswith("daintree.hosts.") for rid in off_pane), off_pane
-    for rid in ("daintree.hostsx.ask", "daintree.orchestration.hosts", "daintree.host.ask"):
+    assert all(rid.startswith(("daintree.hosts.", "daintree.assistants.")) for rid in off_pane), (
+        off_pane
+    )
+    for rid in (
+        "daintree.hostsx.ask",
+        "daintree.orchestration.hosts",
+        "daintree.host.ask",
+        "daintree.assistant.resume",
+        "daintree.assistantsx.resume",
+        "daintree.orchestration.assistants",
+    ):
         assert baseline_callers(rid, model) == PANE_CALLERS, rid
 
 
@@ -147,6 +166,7 @@ def test_metadata_cannot_make_a_runbook_a_hosts_runbook() -> None:
     pane runbook. And a hosts runbook's baseline cannot borrow a pane's owned tools."""
     for tool in sorted(HOST_CONTROL_TOOLS | {"assistant.list", "assistant.start"}):
         assert baseline_violation("daintree.release.ask-a-host", [tool]) is not None, tool
+        assert baseline_violation("daintree.release.resume-everywhere", [tool]) is not None
     hosts = "daintree.hosts.example"
     assert baseline_violation(hosts, ["host.list", "host.call"]) is None
     assert baseline_violation(hosts, ["host.list", "project.openOnHost"]) is None
@@ -403,3 +423,82 @@ def test_no_runbooks_positive_trigger_is_contained_in_anothers(model: Model) -> 
         if a != b and wa and wa < wb
     ]
     assert not contained, f"runbooks with no unique positive region: {contained}"
+
+
+def test_the_global_assistant_is_its_own_caller() -> None:
+    """The global Assistant is captured from the same build, offered only its root
+    tools, and reaches projects through `host.call` alone, under an allow-list that
+    keeps the command runner, the session resume and every unscoped tool from it. An
+    assistants runbook's baseline, its foundation included, must run on one of its
+    callers: the global one counts what its `host.call` reaches, never a pane's tools."""
+    commit = capture("help-core")["capture"]["app_commit"]
+    for surface in GLOBAL_SURFACES:
+        recorded = capture(surface)["capture"]
+        assert recorded["app_commit"] == commit, surface
+        assert recorded["caller_origin"] == "global", surface
+        assert recorded["tier"] == capture(GLOBAL_TIER_SURFACE[surface])["capture"]["tier"]
+        assert set(recorded["root_tools"]) == {"host.list", "host.call", "host.settings"}
+        assert action_ids(surface) == set(recorded["root_tools"]), surface
+        admits = set(recorded["host_call"]["admits"])
+        assert not admits & set(recorded["host_call"]["withheld"]), surface
+        assert {"project.runCommand", "project.runCheck", "agentSessionHistory.resume"} <= set(
+            recorded["host_call"]["withheld"]
+        )
+        reached = action_ids(RELAYED_SURFACE[surface])
+        assert reached <= admits and reached <= action_ids(
+            {"global-core": "relayed-core", "global-full": "relayed-full"}[surface]
+        )
+        assert not reached & {"terminal.sendCommand", "terminal.close", "project.runCommand"}
+        assert {"terminal.list", "terminal.sendCommandOwned", "agent.launch"} <= reached
+    assistants = "daintree.assistants.example"
+    assert baseline_violation(assistants, ["host.list", "host.call"]) is None
+    # The foundation's terminal reads, through host.call.
+    assert baseline_violation(assistants, ["host.call", "terminal.list"]) is None
+    assert baseline_violation(assistants, ["terminal.sendCommandOwned"]) is None
+    # A project Assistant runs the unscoped send in its own project; the global one
+    # only the owned send, through host.call. A baseline needing both runs nowhere.
+    assert baseline_violation(assistants, ["terminal.sendCommand"]) is None
+    assert baseline_violation(assistants, ["terminal.sendCommand", "terminal.sendCommandOwned"])
+    # And a pane runbook still cannot borrow what host.call reaches for the global caller.
+    assert baseline_violation("daintree.release.example", ["host.call", "terminal.list"])
+
+
+def test_the_global_assistants_listing_gap_stays_visible() -> None:
+    """What the global Assistant lists is recorded apart from what it may call: at the
+    captured commit its `tools/list` is empty, and the tests read its root tools'
+    schemas from the help surface rather than pretend they were listed. When a capture
+    lists them, `root_tools_listed` says so and the note goes."""
+    for surface in GLOBAL_SURFACES:
+        recorded = capture(surface)["capture"]
+        listed = listed_action_ids(surface)
+        assert listed <= set(recorded["root_tools"]), surface
+        assert sorted(listed) == recorded["root_tools_listed"], surface
+        unlisted = set(recorded["root_tools"]) - listed
+        noted = any("does not carry" in note for note in recorded.get("notes", []))
+        assert noted == bool(unlisted), surface
+        offered = recorded["host_control"]
+        assert offered["assistant_tools_offered"] is False, surface
+        assert offered["command_runner_offered"] is False, surface
+
+
+def test_the_runbooks_match_what_daintree_provisions_the_global_assistant() -> None:
+    """Native setup as the app's own helpers generate it at the captured commit (a
+    configuration contract, not observed launch wiring): the runbook server and its
+    headers, the instructions that drop the project Assistant's owned-to-unscoped
+    translation, and the checkpoint folder the foundation names, which is not the
+    scratch folder."""
+    catalog = load_catalog()
+    foundation = catalog.get("daintree.foundation")
+    assert foundation is not None
+    for surface in GLOBAL_SURFACES:
+        setup = capture(surface)["capture"]["native_setup"]
+        assert setup["runbooks_mcp_server"] == "daintree-runbooks"
+        assert setup["runbooks_headers_connected"]["Daintree-Hosts"] == "connected"
+        addendum = setup["runbooks_addendum"]
+        assert "you have no project of your own" in addendum
+        assert "`terminal.sendCommandOwned`" in addendum and "as written" in addendum
+        assert "yours is `terminal.sendCommand`" not in addendum
+        assert setup["checkpoint_bucket"] == "global"
+        assert f"`${setup['checkpoint_env']}`" in foundation.body
+        assert setup["scratch_env"] not in foundation.body
+        assert setup["checkpoint_env"] in setup["checkpoint_addendum"]

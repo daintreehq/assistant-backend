@@ -17,6 +17,8 @@ The capture also ran 241 app host-control contract tests.
 | file | tools | `mcp.surface` hash |
 |---|---|---|
 | `external.json` | 35 | `e037a9a2…` |
+| `global-core.json` | 0 (3 root tools) | `8ae74d79…` |
+| `global-full.json` | 0 (3 root tools) | `baf5980b…` |
 | `help-core.json` | 45 | `442ecb41…` |
 | `help-full.json` | 93 | `2f9f2157…` |
 | `pane-core.json` | 79 | `9ca140da…` |
@@ -48,11 +50,40 @@ tool (a call does not chain) or `help.displayImage`. A host with no window on th
 project lists less to a relay (`capture.variants.no_view_attached`), but calls
 name a tool by id and run regardless.
 
+## The global Assistant
+
+`global-core.json` and `global-full.json` are the installation's one projectless
+Daintree Assistant (app #14159, #14161): a help session main runs with no project and
+no view, under `GLOBAL_ASSISTANT_ID`. It may call only its root tools
+(`capture.root_tools`: `host.list`, `host.call`, `host.settings`); every project,
+this machine's under `hostId` `local`, is reached through `host.call`, where the host
+admits only `capture.host_call.admits` (`GLOBAL_ALLOWED_TOOLS`) and refuses the rest
+`policy_rejected`: no `project.runCommand` or `project.runCheck`, no
+`agentSessionHistory.resume`, no unscoped terminal tool. The owned tools act on what
+it launched there or the person handed it (Hand to orchestrator, Global Assistant);
+it closes only what it launched.
+
+At `1752ef90` its `tools/list` is **empty**: it is listed from the viewless help base
+manifest, which carries no `host.*` entry, although dispatch admits the three root
+tools (`capture.notes`). The tests read the root tools' schemas from the help surface
+of the same Tool set and record the gap rather than hide it. `capture.native_setup`
+records the configuration contract the app's own helpers generate for its CLI besides the
+MCP (not observed launch wiring: the integration smoke still owes that): the `daintree-runbooks`
+server and its headers, the runbook instructions (owned tool names as written, through
+`host.call`), the checkpoint instructions, `DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR` (bucket
+`global`, kept across launches) and the scratch variable. These two files are
+callers, not listings, so they sit outside `SURFACES` in
+`tests/daintree_mcp_surfaces.py` (`GLOBAL_SURFACES`); what a global `host.call` can
+name is the relayed surface of its Tool set narrowed to `admits`
+(`global-relayed-core`, `global-relayed-full`).
+
 **Caller policy.** A runbook's `requiredTools` and untagged examples are checked
 against its caller's surface, decided by the id namespace alone (`CALLER_POLICY`
-in `tests/daintree_mcp_surfaces.py`): `pane-core` by default, and for
-`daintree.hosts.*` the sidebar assistant (`help-core` or `help-full`), the whole
-baseline on one of them. A tagged `host.call` example is validated twice: the
+in `tests/daintree_mcp_surfaces.py`): `pane-core` by default, for
+`daintree.hosts.*` the sidebar assistant (`help-core` or `help-full`), and for
+`daintree.assistants.*` Daintree's own assistant, global first (`global-core`,
+`global-full`, `help-core`, `help-full`), the whole baseline on one of them; a global
+caller's baseline counts what its `host.call` reaches. A tagged `host.call` example is validated twice: the
 call against the help surface, and its `tool` and `args` against the relayed
 surface of the same tier.
 
@@ -142,7 +173,7 @@ tests/fixtures/daintree_mcp/capture/capture.sh <commit-ish> [branch-label]
 that commit, links `node_modules` into it, copies
 `capture/captureMcpSurfaces.test.ts` into `src/services/actions/__tests__/` there,
 runs it and then the app's own host-control contract tests at the same commit,
-writes the seven files here and removes the worktree. It never writes into the app
+writes the nine files here and removes the worktree. It never writes into the app
 checkout, and it does not remove a stale file: refresh them all together, since
 the hygiene test fails when they come from different builds.
 

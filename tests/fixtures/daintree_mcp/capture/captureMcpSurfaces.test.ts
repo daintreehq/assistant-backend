@@ -109,6 +109,23 @@ import { createActionRegistry, measureWireSurface } from "./helpers/wireSurface"
 import { MCP_EXTERNAL_OMITTED_ARGS } from "@shared/config/mcpExternalTierAllowlist";
 import { omitWireSchemaArgs } from "@shared/utils/mcpWireSchema";
 import { HOST_CONTROL_TOOL_IDS } from "@shared/types/hostControl";
+import { GLOBAL_ASSISTANT_ID, GLOBAL_ASSISTANT_TOOL_IDS } from "@shared/config/globalAssistant";
+import {
+  GLOBAL_ALLOWED_TOOLS,
+  GLOBAL_WITHHELD_TOOLS,
+} from "../../../../electron/remote/assistant/HostCallRuntime";
+import {
+  RUNBOOKS_MCP_SERVER_NAME,
+  buildRunbooksAddendum,
+  buildRunbooksHostHeaders,
+} from "../../../../electron/services/helpSessionRunbooks";
+import {
+  ASSISTANT_GLOBAL_CHECKPOINT_BUCKET,
+  ASSISTANT_RUN_CHECKPOINT_ENV_VAR,
+  ASSISTANT_RUN_CHECKPOINT_WRITER_ENV_VAR,
+  buildRunCheckpointAddendum,
+} from "../../../../electron/services/AssistantRunCheckpointService";
+import { ASSISTANT_SCRATCH_ENV_VAR } from "../../../../electron/services/AssistantScratchService";
 import { ASSISTANT_CONTROL_TOOL_IDS } from "@shared/types/assistantControl";
 import {
   bindHostControl,
@@ -159,7 +176,7 @@ interface SurfaceSpec {
   /** Output file stem, or for a variant the name it is checked under. */
   name: string;
   /** Human label for the fixture's `caller_origin`. */
-  callerOrigin: "agent-pane" | "help" | "api-key" | "relayed";
+  callerOrigin: "agent-pane" | "help" | "global" | "api-key" | "relayed";
   /** The MCP session origin main records for this caller (`McpSessionOrigin`). */
   origin: "help" | "external";
   tier: McpTier;
@@ -178,6 +195,12 @@ interface SurfaceSpec {
   hostControlReachable: boolean;
   /** Opened by `openRelaySession` for another machine's assistant: `deps.relay` is set. */
   relay: boolean;
+  /**
+   * The installation's one projectless assistant (#14159): a viewless help
+   * session whose row names `GLOBAL_ASSISTANT_ID`, offered only its root tools
+   * (#14161) and reaching every project through `host.call`.
+   */
+  global?: boolean;
   /** What `assistantCaller()` resolves to: a help session in its project, a relay principal, or nobody. */
   assistantCaller: "local" | "relay" | null;
   /** The renderer added-hosts list of the view answering the manifest. */
@@ -306,6 +329,25 @@ const SURFACES: SurfaceSpec[] = [
     description: "The same assistant with no window, Tool set = Full.",
   },
   {
+    ...HELP,
+    name: "global-core",
+    callerOrigin: "global",
+    tier: "core",
+    manifestSource: "viewless-help",
+    global: true,
+    description:
+      "This installation's one global Daintree Assistant (#14159, #14161), Tool set = Core: a help session main runs with no project and no view, its row naming GLOBAL_ASSISTANT_ID, listed from the viewless help base surface. Offered only its root tools (GLOBAL_ASSISTANT_TOOL_IDS); every project, this machine's under hostId local, is reached through host.call, where the host admits only GLOBAL_ALLOWED_TOOLS (recorded in capture.host_call), the owned tools acting on what it launched there or the person handed it.",
+  },
+  {
+    ...HELP,
+    name: "global-full",
+    callerOrigin: "global",
+    tier: "full",
+    manifestSource: "viewless-help",
+    global: true,
+    description: "The same global assistant with Tool set = Full.",
+  },
+  {
     name: "external",
     callerOrigin: "api-key",
     origin: "external",
@@ -387,6 +429,9 @@ function checkSpec(spec: SurfaceSpec): void {
   }
   if (spec.manifestSource === "no-view" && !spec.workspaceBound) throw bad("no-view is bound");
   if (spec.manifestSource === "viewless-help" && !spec.helpSession) throw bad("viewless is help");
+  if (spec.global && (spec.manifestSource !== "viewless-help" || spec.workspaceBound)) {
+    throw bad("the global assistant is a viewless, unbound help session");
+  }
 }
 
 const WORKSPACE_BINDING = {
@@ -419,7 +464,10 @@ function sessionStoreFor(sessionId: string, spec: SurfaceSpec): SessionStore {
   if (spec.helpSession) {
     store.sessionHelpIdMap.set(sessionId, helpSessionIdOf(sessionId));
     if (spec.manifestSource === "viewless-help") {
-      store.sessionViewlessHelpMap.set(sessionId, WORKSPACE_BINDING.workspaceId);
+      store.sessionViewlessHelpMap.set(
+        sessionId,
+        spec.global ? GLOBAL_ASSISTANT_ID : WORKSPACE_BINDING.workspaceId
+      );
     } else {
       store.sessionWebContentsMap.set(sessionId, CAPTURE_WEB_CONTENTS_ID);
     }
@@ -454,7 +502,7 @@ function sessionDeps(
       ? {
           kind: "local" as const,
           helpSessionId: helpSessionIdOf(sessionId),
-          projectId: WORKSPACE_BINDING.workspaceId,
+          projectId: spec.global ? GLOBAL_ASSISTANT_ID : WORKSPACE_BINDING.workspaceId,
           machineName: "capture-machine",
         }
       : spec.assistantCaller === "relay"
@@ -721,10 +769,14 @@ describe("capture Daintree MCP surfaces", () => {
       const allowlisted = new Set(getReachableActionIds(spec.tier, rendererOwned, spec.paneApproval));
       if (gates.commandRunner) allowlisted.add(PROJECT_RUN_COMMAND);
       if (gates.assistantCaller) for (const id of ASSISTANT_CONTROL_TOOL_IDS) allowlisted.add(id);
+      const globalRootOnly = (id: string) => !spec.global || GLOBAL_ASSISTANT_TOOL_IDS.has(id);
 
       // Why the caller rules withhold an allowlisted id from this session
       // whatever its view shows, or null when they don't.
       const gateReason = (id: string): string | null => {
+        if (!globalRootOnly(id)) {
+          return "not a root tool of the global assistant: it reaches every project through host.call";
+        }
         if (spec.relay && isWithheldFromRelaySession(id)) {
           return "withheld from a relayed session: no host.* tool (a call never chains), none of this machine's assistant-panel tools";
         }
@@ -777,13 +829,21 @@ describe("capture Daintree MCP surfaces", () => {
       // The host-control contract, stated outright as well.
       const ids = new Set(listedIds);
       for (const id of HOST_CONTROL_TOOL_IDS) {
-        expect(ids.has(id), `${spec.name}: ${id} listing`).toBe(gates.hostCall);
+        // The global assistant is listed from the viewless base manifest, so a
+        // root tool appears only where that manifest carries it.
+        const inManifest = !spec.global || byId.has(id);
+        expect(ids.has(id), `${spec.name}: ${id} listing`).toBe(
+          gates.hostCall && globalRootOnly(id) && inManifest
+        );
+      }
+      if (spec.global) {
+        expect(listedIds.filter((id) => !GLOBAL_ASSISTANT_TOOL_IDS.has(id)), `${spec.name}: beyond its root tools`).toEqual([]);
       }
       if (spec.relay) {
         expect(listedIds.filter((id) => id.startsWith("host.")), `${spec.name}: host.* on a relay`).toEqual([]);
         expect(ids.has("help.displayImage"), `${spec.name}: help.displayImage on a relay`).toBe(false);
       }
-      if (spec.manifestSource === "view") {
+      if (spec.manifestSource === "view" && !spec.global) {
         for (const id of ASSISTANT_CONTROL_TOOL_IDS) {
           expect(ids.has(id), `${spec.name}: ${id} listing`).toBe(gates.assistantCaller);
         }
@@ -851,8 +911,10 @@ describe("capture Daintree MCP surfaces", () => {
           return tool;
         })
         .sort((a, b) => (String(a["action_id"]) < String(b["action_id"]) ? -1 : 1));
+      // The global assistant may not call mcp.surface, and its root-tool filter
+      // is the session server's, not buildSurfaceManifest's: compare its share.
       expect(
-        new Set(direct.tools.map((t) => t.id)),
+        new Set(direct.tools.map((t) => t.id).filter(globalRootOnly)),
         `${spec.name}: mcp.surface tools differ from tools/list`
       ).toEqual(ids);
 
@@ -874,10 +936,18 @@ describe("capture Daintree MCP surfaces", () => {
           "An agent pane's tier is where auto-approval stops, not a ceiling (#12692): tools/list also carries every tool up to the full non-renderer-owned surface, and calling one above the tier asks the user first. The wire listing is therefore the same at core and full; tools[].daintree.reach says which run without asking ('tier') and which ask ('approval')."
         );
       }
-      if (gates.assistantCaller || gates.commandRunner) {
+      if ((gates.assistantCaller || gates.commandRunner) && !spec.global) {
         notes.push(
           "tools[].daintree.reach 'caller': admitted by its caller rule rather than the tier allowlist (mayControlAssistants for assistant.list, assistant.start and agent.readQuota; mayRunProjectCommand for project.runCommand). No grant widens either."
         );
+      }
+      if (spec.global) {
+        const unlisted = sortIds([...GLOBAL_ASSISTANT_TOOL_IDS].filter((id) => !ids.has(id)));
+        if (unlisted.length > 0) {
+          notes.push(
+            `Root tools the dispatch guard admits but tools/list does not carry: ${unlisted.join(", ")}. They are absent from the viewless help base manifest (generated mcpExternalBaseManifest + mcpViewlessBaseManifest) this session is listed from, so a client that calls only listed tools cannot reach them at this commit.`
+          );
+        }
       }
       if (spec.relay) {
         notes.push(
@@ -908,8 +978,10 @@ describe("capture Daintree MCP surfaces", () => {
             call_reachable: spec.helpSession ? spec.hostControlReachable : null,
             host_tools_offered: gates.hostCall,
             assistant_caller: spec.assistantCaller,
-            assistant_tools_offered: gates.assistantCaller,
-            command_runner_offered: gates.commandRunner,
+            // The global assistant passes the caller rules, then lists and runs
+            // only its root tools: what it is effectively offered.
+            assistant_tools_offered: gates.assistantCaller && !spec.global,
+            command_runner_offered: gates.commandRunner && !spec.global,
           },
           // The view that answered the manifest.
           machine: {
@@ -934,6 +1006,43 @@ describe("capture Daintree MCP surfaces", () => {
                 context_gated_tools: contextual.filter(
                   (id) => allowlisted.has(id) && gateReason(id) === null
                 ),
+              }
+            : {}),
+          // What `host.call` admits from this caller in any project, on any
+          // host (`HostCallRuntime.call`): an allow-list, refused otherwise
+          // as `policy_rejected` before the call leaves this machine.
+          ...(spec.global
+            ? {
+                // What the dispatch guard runs for it directly
+                // (`sessionServer.ts`), whether or not the listing shows it.
+                root_tools: sortIds(GLOBAL_ASSISTANT_TOOL_IDS),
+                root_tools_listed: sortIds([...GLOBAL_ASSISTANT_TOOL_IDS].filter((id) => ids.has(id))),
+                host_call: {
+                  admits: sortIds(GLOBAL_ALLOWED_TOOLS),
+                  withheld: sortIds(GLOBAL_WITHHELD_TOOLS),
+                  method:
+                    "GLOBAL_ALLOWED_TOOLS and GLOBAL_WITHHELD_TOOLS imported from electron/remote/assistant/HostCallRuntime.ts at this commit. What a call can name is the relayed surface of the same Tool set narrowed to `admits`: the host still applies its tier, ownership and drive rule.",
+                },
+              }
+            : {}),
+          // The configuration contract the app's own helpers generate for this
+          // assistant's CLI besides the MCP (HelpSessionService calls them at
+          // provision): the runbook server, its headers, the runbook and
+          // checkpoint instructions, and the env names its PTY gets. Not observed
+          // launch wiring.
+          ...(spec.global
+            ? {
+                native_setup: {
+                  runbooks_mcp_server: RUNBOOKS_MCP_SERVER_NAME,
+                  runbooks_headers_connected: buildRunbooksHostHeaders("connected"),
+                  runbooks_headers_unknown: buildRunbooksHostHeaders(null),
+                  runbooks_addendum: buildRunbooksAddendum({ global: true }),
+                  checkpoint_env: ASSISTANT_RUN_CHECKPOINT_ENV_VAR,
+                  checkpoint_writer_env: ASSISTANT_RUN_CHECKPOINT_WRITER_ENV_VAR,
+                  checkpoint_bucket: ASSISTANT_GLOBAL_CHECKPOINT_BUCKET,
+                  checkpoint_addendum: buildRunCheckpointAddendum(),
+                  scratch_env: ASSISTANT_SCRATCH_ENV_VAR,
+                },
               }
             : {}),
           ...(notes.length > 0 ? { notes } : {}),

@@ -12,15 +12,15 @@ requires:
   - daintree.foundation
 hostEligibility: any
 ---
-A Remote Host runs its own Daintree. `host.list` gives the hosts you may reach and, while one is connected with control on, its projects; `host.call` runs one of its own tools in one of them, under its Tool set, ownership and confirmations:
+A Remote Host runs its own Daintree. `host.list` gives the hosts you may reach and, while connected with control on, their projects; `host.call` runs one of its own tools in one of them, under its Tool set, ownership and confirmations:
 
 ```json tool=host.call
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"terminal.getStatus","args":{"terminalIds":["<terminalId>"]}}
 ```
 
-- **The work's machine.** Settle where each step acts. Anything on a host is reached only through `host.call`; your own tools and shell act on this machine. Your shell is for what both share: the remote (`git ls-remote`, a fetch) and the forge (`gh`).
-- **Host references.** Paths, ids and ports in a host's results mean nothing here: keep each with its `hostId` and `projectId` for calls to that host. Hand work between machines by reference: repository, branch, full SHA, PR URL.
-- **Checks there.** `project.runCommand` at either Tool set, `project.runCheck` at Full (no TTY, never a server); a check needing judgment goes to an agent there.
+- **The work's machine.** Settle where each step acts. Anything on a host is reached only through `host.call`; your own tools and shell act on this machine. Your shell is for what both share: the remote and the forge (`git ls-remote`, `gh`).
+- **Host references.** Paths, ids and ports in a host's results mean nothing here: keep each with its `hostId` and `projectId`. Hand work between machines by reference: repository, branch, full SHA, PR URL.
+- **Checks there.** `project.runCommand` at either Tool set, `project.runCheck` at Full (no TTY, no server), not for the global Assistant (the forge's, or an agent's claim); judgment: an agent there.
 - **Drive or delegate.** Drive a host yourself by default, as you would here. Delegate to its assistant only for its own judgment, or a large batch for its agents to split.
 - **Delegating.** `assistant.list` there: one at its prompt (`agentState` `waiting` at a `prompt`), else one `assistant.start` (`ready:false` still runs: never start another). Send with `terminal.sendCommandOwned`: its `terminalId` and `generation`, `handback:true`, `notify:true`, the brief by reference; end the turn. `ASSISTANT_BUSY` (mid-turn, a draft in its prompt, or stopped on a question for the person there): wait or tell the person, never type over it; `ASSISTANT_RESTARTED`: list again. Its answer (`terminal.readLastMessageOwned`) is a claim to verify.
 - **Notices.** A host's notice names the host and may never come: pair it with `terminal.getStatus` there, paced to the work.

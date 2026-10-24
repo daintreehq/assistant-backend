@@ -126,9 +126,15 @@ and stated with its date ("September 2026 builds; revalidate").
   `args` are validated against it.
 - **API-key client** (`external`): a curated subset with **no `notify`** on
   `agent.launch` or the sends and no `terminal.notifyWhenIdle`.
+- **Global Assistant** (`global-*`): the projectless Daintree Assistant. Root tools
+  only (`host.list`, `host.call`, `host.settings`); every project, this machine's as
+  `hostId` `local`, through `host.call` under an allow-list (owned tools as written,
+  no `project.runCommand`/`runCheck`, no `agentSessionHistory.resume`). Followed for
+  `daintree.assistants.*`, global first.
 
 A runbook's baseline path is the agent-pane path, except in `daintree.hosts`, whose
-baseline runs on the Shell's sidebar assistant (`CALLER_POLICY`). A sidebar-only
+baseline runs on the Shell's sidebar assistant, and `daintree.assistants`, whose baseline
+runs on Daintree's own assistant, the global one first (`CALLER_POLICY`). A sidebar-only
 variant is one short line plus `optionalTools`; a pane runbook's host branch lists
 `host.list`/`host.call` there too, and stays a sentence or two: a caller with a host
 connected is sent `daintree.hosts.foundation` with every runbook.

@@ -33,9 +33,9 @@ from typing import Any
 
 import pytest
 from daintree_mcp_surfaces import (
+    CALLER_SURFACES_BY_MODEL,
     MODELS,
     RELAYED_SURFACE,
-    SURFACES_BY_MODEL,
     Model,
     input_schemas,
     untagged_example_surfaces,
@@ -72,7 +72,7 @@ def test_tagged_examples_are_present_and_well_formed() -> None:
 
 def _resolve(model: Model, runbook_id: str, tool: str, surface: str | None) -> str:
     if surface is not None:
-        assert surface in SURFACES_BY_MODEL[model], (
+        assert surface in CALLER_SURFACES_BY_MODEL[model], (
             f"{runbook_id}: unknown surface annotation {surface!r}"
         )
         assert tool in input_schemas(surface, model), (
@@ -175,3 +175,56 @@ def test_a_host_call_is_validated_inside_as_well() -> None:
     for surface, arguments in failures:
         with pytest.raises(AssertionError):
             validate_example("control", hosts, "host.call", surface, arguments)
+
+
+def test_a_global_callers_host_call_is_held_to_what_the_host_admits_from_it() -> None:
+    """The global Assistant has no project of its own: everything runs through
+    `host.call`, owned names as written (no project Assistant's translation to the
+    unscoped tools), and the host admits only its allow-list, at the call's Tool set."""
+    assistants = "daintree.assistants.example"
+    send = {"terminalId": "<id>", "command": "<brief>", "handback": True, "notify": True}
+    listing = {"includeAgents": True}
+    validate_example("control", assistants, "host.list", None, listing)
+    for surface in (None, "global-core", "global-full"):
+        validate_example(
+            "control", assistants, "host.call", surface, _host_call("terminal.list", {})
+        )
+        validate_example(
+            "control",
+            assistants,
+            "host.call",
+            surface,
+            _host_call("terminal.sendCommandOwned", send),
+        )
+    command = {"projectId": "<projectId>", "command": "npm test"}
+    resume = {"worktreeId": "<worktreeId>", "sessionId": "<sessionId>"}
+    failures: list[tuple[str | None, dict[str, Any]]] = [
+        # Withheld from the global caller on every host: it acts only on what it
+        # launched or was handed.
+        (None, _host_call("project.runCommand", command)),
+        ("global-full", _host_call("project.runCommand", command)),
+        ("global-full", _host_call("agentSessionHistory.resume", resume)),
+        # No unscoped twin: the project Assistant's translation does not apply.
+        (None, _host_call("terminal.sendCommand", send)),
+        # Admitted from it, but the host's tier still applies at Core.
+        ("global-core", _host_call("terminal.new", {})),
+    ]
+    for surface, arguments in failures:
+        with pytest.raises(AssertionError):
+            validate_example("control", assistants, "host.call", surface, arguments)
+    # Its own surface is the root tools alone: a project tool is never called directly,
+    # with arguments the tool itself would accept.
+    direct = {
+        "terminal.list": {},
+        "terminal.sendCommandOwned": send,
+        "agent.launch": {"agentId": "claude", "prompt": "<brief>"},
+    }
+    for tool, arguments in direct.items():
+        validate_example("control", "daintree.release.example", tool, "pane-core", arguments)
+        with pytest.raises(AssertionError, match="is not offered to global-core"):
+            validate_example("control", assistants, tool, "global-core", arguments)
+    # An untagged example there is the global caller's: a direct project read does not
+    # quietly resolve on the project Assistant, whose variant must name its surface.
+    with pytest.raises(AssertionError, match="is not offered to any of its callers"):
+        validate_example("control", assistants, "terminal.list", None, {})
+    validate_example("control", assistants, "terminal.list", "help-core", {})
