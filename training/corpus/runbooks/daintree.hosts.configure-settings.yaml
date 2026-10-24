@@ -1,0 +1,61 @@
+# daintree.hosts.configure-settings: Read or change a named setting on Remote Hosts
+# Current procedure and routing boundaries: runbooks/catalog/hosts/daintree.hosts.configure-settings.md
+
+runbook: daintree.hosts.configure-settings
+run: runbook-2026-10-24-issue-171
+positives:
+  - Switch Canopy on for the three remote machines, show the person exactly what changes on each and get one approval for the lot
+  - Read whether Canopy is on, off or hidden on each connected host and report it without changing anything
+  - The person wants Claude as the agent the Linux server starts by default; preview that one change there and apply it once they approve
+  - Turn the idle-terminal alert off on the build machine and confirm the value it reports afterwards
+  - Raise the idle alert threshold on both remote Macs to ninety minutes, one approval for both
+  - Check which agent runs the Daintree assistant on each remote host, then change it only on the one the person names
+  - Hide Canopy on the spare tower; nothing else on that machine should change
+  - Canopy went on for two hosts but the third came back unreachable; report each host's outcome and say what is left to do
+  - The apply came back with one host in conflict because its value changed there after the preview; read it again and tell the person before anything else
+  - An apply reported ambiguous for one host; read that setting there first and only then decide whether a new preview is needed
+  - The preview ticket is more than five minutes old; preview again and put the fresh change in front of the person
+  - The person declined the approval dialog; tell them nothing was written on any host
+  - Enable Canopy on every host this Shell has, but one of them has assistant control switched off; leave it out and name it
+  - What is the idle notification threshold set to on each of my studios right now
+  - Put the default agent back to unset on the server, as a new change with its own preview
+  - Turn Canopy on across all my hosts, including the one where it's hidden at the moment
+  - The host's Daintree is too old to take settings from here; report it as unsupported and leave the other hosts' change standing
+  - The person wants alerts about idle terminals on the remote machines at two hours instead of the default
+  - Read the default agent and the assistant agent on the mac mini and report both values
+  - Canopy is on for two of the hosts already; only the others should change, and the report should say which were already set
+  - change the idle alert minutes on the linux box to 30
+  - turn canopy on everywhere
+  - is canopy on on the studio
+  - set the default agent on the build server to codex
+  - flip idle terminal alerts on for all my remote machines
+  - hide canopy on the old mac
+  - what assistant agent is the second studio using
+  - make claude the assistant agent on every host and tell me which ones took it
+  - "hey, can you turn on Canopy for both my remote macs? I'm happy to approve it once"
+  - "quick one: what's the idle alert set to on the server, don't change anything"
+  - query: ok, apply it to both
+    history:
+      - 'user: turn canopy on for the two studios'
+      - 'assistant: The preview shows Canopy going from off to on on both studios. Shall I apply it? You will see one approval dialog listing both.'
+  - query: now do the same on the linux box
+    history:
+      - 'user: set the default agent on the mac mini to codex'
+      - 'assistant: Done: the mac mini now reports codex as its default agent.'
+boundaries:
+  - query: set the other machine's default agent to the same one I use here
+    confusable_with: [daintree.hosts.copy-portable-settings, daintree.agents.choose-agent-model]
+  - query: change only the idle alert minutes on the remote host, not the rest of my preferences
+    confusable_with: [daintree.hosts.copy-portable-settings]
+  - query: turn Canopy on for the server; I don't want to copy any of my other settings there
+    confusable_with: [daintree.hosts.copy-portable-settings]
+  - query: tell me which of my hosts have Canopy reading their terminals right now, nothing about load
+    confusable_with: [daintree.hosts.survey-hosts]
+  - query: read the idle alert setting on every connected host
+    confusable_with: [daintree.hosts.survey-hosts]
+  - query: the new host connected fine a minute ago; now switch its idle alert on
+    confusable_with: [daintree.hosts.connect-host]
+  - query: my hosts are all connected, so enable Canopy on each of them
+    confusable_with: [daintree.hosts.connect-host]
+  - query: before I open the project on the remote mac, make codex its default agent
+    confusable_with: [daintree.hosts.open-project-on-host]
