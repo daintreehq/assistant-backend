@@ -50,7 +50,8 @@ maintainers wrote the traps into it.
   `terminal.closeOwned`, `terminal.injectOwned`.
 - `help-core` / `help-full`: Daintree's sidebar assistant, which gets the unscoped
   `terminal.sendCommand` and `terminal.close`, and alone is offered `host.list` and
-  `host.call` (direct control of a Remote Host) and `assistant.list`/`assistant.start`.
+  `host.call` (direct control of a Remote Host), `assistant.list`/`assistant.start`, and
+  the command runner `project.runCommand` at Core as at Full.
 - `relayed-core` / `relayed-full`: what a Remote Host offers inside `host.call`, at the
   calling assistant's Tool set: the owned terminal tools, agents, worktrees,
   `assistant.*` and the command runner (`project.runCommand`, admitted by caller at

@@ -32,6 +32,6 @@ Final report, once every row has settled or the person asks for the account of a
 
 On notice or resume: the notice names the host and terminal; step 2 for it, then the sweep. A notice is a stop, not a success.
 
-Stop and recovery: one answer per question and one question per unpushed unit, never resent; nothing relaunched, moved or closed here.
+Stop and recovery: one answer per question and one question per unpushed unit, never resent; nothing relaunched, moved, refilled or closed here (a refill is daintree.hosts.place-work's).
 
 Report back: a row per unit: host, state, branch and SHA claimed versus verified and how, checks, timings as observed; what waits on the person; then the leftovers with owners.
