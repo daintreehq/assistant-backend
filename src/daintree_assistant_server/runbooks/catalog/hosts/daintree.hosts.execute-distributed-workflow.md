@@ -17,7 +17,7 @@ Procedure:
 3. Per ready unit, `host.list` read again (and before its launch): its host pressured or unmeasured (as daintree.hosts.rebalance-load reads it) holds that unit, reported, while ready units elsewhere go on. Else mark it `launching` with the time, then on its host (holding the base SHA first: `git fetch origin <branch>` then `git cat-file -e <SHA>^{commit}` there, by `project.runCommand`) a worktree on `<run>/<unit>` from that SHA (`worktree.createWithRecipe`, `collisionPolicy:"error"`, then `worktree.waitUntilReady` with its `worktreeId`) and one agent there, each write under a fresh `newCallId`; record the returned ids and mark it `running` (`launched:false`: nothing started; it stays ready, and the retry launches in its worktree):
 
 ```json tool=host.call
-{"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.launch","args":{"agentId":"claude","name":"<run>: <unit>","worktreeId":"<worktreeId>","prompt":"<brief>","notify":true,"handback":true}}
+{"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.launch","args":{"agentId":"<agentId>","model":"<only if named>","presetId":"<only if named>","name":"<run>: <unit>","worktreeId":"<worktreeId>","prompt":"<brief>","notify":true,"handback":true}}
 ```
 
    The brief: confirm `origin` is <remote>, else stop; fetch and build on exactly these SHAs, no newer tip, no other repository's history; a missing pin or a contract mismatch: stop and report; acceptance and the checks to run; commit, push `<run>/<unit>`, reply with the SHA and each check's command and result. End the turn.

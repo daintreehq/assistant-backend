@@ -11,7 +11,7 @@ hostEligibility: connected
 ---
 Only work not started moves; a started unit stays, throttled, or goes to daintree.hosts.reassign-host-work on the person's word. The person's hosts, per-host caps and models stand: nothing goes to a host they did not choose, and no model is swapped. Allowance is per host and account, never summed: one account on two hosts is one allowance.
 
-1. Readings: `host.list` `connection` and `load` with its `ageMs`: `cpuIdleCores`, `memoryAvailableBytes`, `memoryPressure`, `thermal`. `load` null, `stale:true` or a null field is unmeasured, never idle. `agentsObserved` is activity (the person's own agents too), never capacity; `cpuPercent` is not compared across machines. Codex allowance per host, through `host.call`:
+1. Readings: `host.list` `connection` and `load` with its `ageMs`: `cpuIdleCores`, `memoryAvailableBytes`, `memoryPressure`, `thermal`. Unmeasured, as daintree.hosts.place-work defines it, is never idle. `agentsObserved` is activity (the person's own agents too), never capacity; `cpuPercent` is not compared across machines. Codex allowance per host, through `host.call`:
 
 ```json tool=host.call
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.readQuota","args":{}}
