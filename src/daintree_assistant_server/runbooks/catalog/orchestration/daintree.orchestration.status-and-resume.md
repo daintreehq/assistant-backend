@@ -29,6 +29,6 @@ On a host: your checkpoints are the local record; read live state on the work's 
 5. Closed sessions: `agentSessionHistory.list` with the exact `worktreeId`, paging with `offset` while `hasMore`. The journal holds no transcript and prunes, so absence proves nothing. Resume only on request with `agentSessionHistory.resume` (`worktreeId`, exact `sessionId`); it restores that agent's conversation, not your checkpoint, notices or ownership. Say so.
 6. "What happened while I was away": `notifications.recent`, combined with the reconciled units.
 
-Continuing an authorized plan needs these fresh target and ownership checks, not a new approval.
+Continuing an authorized plan needs these fresh target and ownership checks, not a new approval; a notice that never came is reconciled in step 3, not a reason to ask again. The sweep itself repairs, relaunches and merges nothing: continued work runs under the plan's own runbook and scope, and push, merge, deploy, cleanup, a new destination or wider scope need authority that covers them.
 
 Report back: one ranked picture with real ids: (a) needs the user now; (b) live, and whether anything will wake you; (c) stopped, awaiting verification; (d) done on evidence, gone, or unknown; (e) resumable sessions. Then checkpoint corrections and their evidence, resources no longer owned, and what continuing needs.
