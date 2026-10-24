@@ -29,4 +29,4 @@ Procedure:
 
 Stop and recovery: one read per candidate; a timed-out or refused read is unverified, read again only on the person's word. Fetch, reset, clone, setup or a start is a separate step the person authorises.
 
-Report back: per host and candidate: project, root, remotes and HEAD seen, clean or dirty, setup, how it was read (command, or agent and `terminalId`), verdict; choices left open.
+Report back: per host and candidate: project, root, remotes and HEAD seen, clean or dirty, setup, how it was read (the command and its `exitCode`), verdict; choices left open.

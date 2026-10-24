@@ -67,8 +67,8 @@ baseline must be on ONE of `help-core` or `help-full`. A pane runbook with a hos
 branch lists `host.list`/`host.call` in `optionalTools`, never `requiredTools`, and
 tags that branch's examples `surface=help-core`. A `host.call` example is validated
 twice: the call against the help surface, and its `tool` and `args` against the
-relayed surface of the same tier, so a Core example cannot run the Full-only command
-runner on a host.
+relayed surface of the same tier, so a Core example cannot run the Full-only check
+runner (`project.runCheck`) on a host.
 
 **One current catalog.** `runbooks/catalog/<domain>/<id>.md` is the only authoring
 source and the only tree the server loads. Directory names organize files; stable

@@ -22,6 +22,6 @@ Read-only on every host: nothing is removed, stopped, closed, fetched there or p
 5. Merged, from your shell on the shared remote: `git ls-remote --heads origin <branch>` (pushed), `gh pr list --state all --head <branch> --json number,state,headRefOid,mergedAt`, and `git merge-base --is-ancestor <host HEAD> <headRefOid>` in your clone (one `git fetch --quiet origin` there is fine; an error is unknown). Git alone misses squash merges. A remote resource the run configured (a cloud devbox) is noted, never probed.
 6. Class per item, every flag named: in use (working or waiting agent, open terminal, listener), dirty or untracked, unpushed, operation in progress, retained service or resource. Safe: clean, idle, no terminal or listener, HEAD inside a merged PR's head, every read ok. Unsafe: any flag. Unknown: pushed but unmerged, a failed read, an unobserved project, an owner unproved, any retained resource. A finished agent is not an abandoned worktree.
 
-Stop and recovery: one read pass per project; a lost or empty read is a gap, never retried into a guess. Cleanup the person authorises is daintree.hosts.recover-and-clean-up, which reads again first.
+Stop and recovery: one read pass per project; a lost, empty, failed, timed-out or truncated read (`exitCode`, `timedOut`, `outputTruncated`) is a gap, never retried into a guess. Cleanup the person authorises is daintree.hosts.recover-and-clean-up, which reads again first.
 
 Report back: per host and project, each item with class, reasons and the decision it needs; coverage gaps; other owners' items counted.
