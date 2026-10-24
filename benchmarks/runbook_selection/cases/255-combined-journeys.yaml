@@ -1,0 +1,356 @@
+# The combined orchestration journey: ask once, leave work running across this machine and
+# the Remote Hosts, come back after a restart, answer the few decisions that need the
+# person, stop assigning, clean up. No runbook owns the whole journey; each step belongs to
+# one procedure, and the step changes the owner. These cases pin the boundary at every
+# change of owner, mostly as routing traps (each excluding the neighbour across that
+# boundary), grouped by the issue's six scenarios:
+#
+#   S1 continuation  daintree.orchestration.status-and-resume | daintree.hosts.recover-and-clean-up
+#   S2 capacity      daintree.orchestration.fan-out-work | daintree.orchestration.work-in-waves,
+#                    daintree.hosts.place-work | daintree.hosts.rebalance-load,
+#                    daintree.hosts.drain-issue-backlog | daintree.hosts.place-work
+#   S3 preparation   daintree.hosts.open-project-on-host | daintree.hosts.delegate-to-host
+#   S4 restart       daintree.hosts.recover-and-clean-up | daintree.hosts.park-swarm,
+#                    daintree.orchestration.status-and-resume | daintree.orchestration.hand-off-orchestration
+#   S5 questions     daintree.hosts.supervise-swarm | daintree.hosts.survey-hosts,
+#                    daintree.hosts.ask-host-assistant
+#   S6 stop/cleanup  daintree.hosts.drain-issue-backlog | daintree.hosts.steer-swarm,
+#                    daintree.orchestration.workspace-cleanup | daintree.orchestration.status-and-resume,
+#                    daintree.hosts.recover-and-clean-up | daintree.orchestration.workspace-cleanup
+#
+# Each case carries the caller's host state, because the journey crosses it: a hosts
+# runbook whose hostEligibility the state does not fit is off the ballot, and a local
+# owner must still win its words for a caller with hosts connected. Steps whose owner is
+# still being delivered (the native global Assistant's own procedures, an assistant inbox,
+# preparing a project and continuing there, capacity-aware refill) have no case here
+# until that owner exists; the S1 cases are this machine's projects, owned today.
+
+cases:
+  # S1: local continuation versus remote recovery.
+  - id: journey-s1-continue-every-local-project
+    category: routing-trap
+    note: >-
+      The issue's first request, verbatim. Every project is on THIS machine, so it is
+      daintree.orchestration.status-and-resume ("what is still open or in flight ... pick
+      up / resume something from an earlier session") even with a host connected, and not
+      daintree.hosts.recover-and-clean-up, which excludes "agents, terminals or worktrees on
+      this machine". Measured before any change: the shipped selector picks
+      daintree.orchestration.fan-out-work, daintree.orchestration.park-work and
+      daintree.agents.hand-off-task (rank_miss); recorded as an honest miss for the global
+      caller work to win.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Continue unfinished work across every project on this machine.
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: journey-s1-pick-up-local-projects
+    category: single-runbook
+    note: >-
+      User-phrased local catch-up with a host connected: "what is still open or in flight
+      ... pick up / resume something from an earlier session".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Pick up whatever I left unfinished in each of my local projects yesterday and tell me what is still open
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: journey-s1-remote-recovery-after-restart
+    category: routing-trap
+    note: >-
+      The true remote recovery: "usually after Daintree restarted ... which delegated
+      pieces finished, which are still running". daintree.orchestration.status-and-resume
+      fences it out ("work sent to assistants on other machines"), so picking it is an extra.
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: Daintree restarted overnight; find out which of the pieces I handed to my two studios finished and which are still running
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  # S2: a rolling cap versus a wave barrier, first placement versus a mid-run rebalance,
+  # and a cross-host backlog versus one placement.
+  - id: journey-s2-rolling-cap-local
+    category: routing-trap
+    note: >-
+      Refill under a cap with no merge between: daintree.orchestration.fan-out-work ("a
+      ROLLING QUEUE under a cap ... start the next one whenever one finishes"), not
+      daintree.orchestration.work-in-waves, which excludes "a rolling queue under a cap,
+      with no merge between waves".
+    host_state: {hosts: none}
+    messages:
+      - role: user
+        content: There are a dozen small chores in the tracker; keep three agents going on them and hand the next chore to whichever agent's slot frees up
+    expect:
+      required: [daintree.orchestration.fan-out-work]
+      optional: [daintree.foundation]
+
+  - id: journey-s2-wave-barrier-local
+    category: routing-trap
+    note: >-
+      The fixed barrier: daintree.orchestration.work-in-waves ("the next wave starts only
+      once the previous wave's pull requests are merged"), not
+      daintree.orchestration.fan-out-work's one batch or rolling queue.
+    host_state: {hosts: none}
+    messages:
+      - role: user
+        content: Run these issues in two waves and only start the second once every PR in the first is merged
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation]
+
+  - id: journey-s2-first-placement
+    category: routing-trap
+    note: >-
+      Initial placement of different pieces by room: daintree.hosts.place-work ("put this
+      on whichever host has room"), not daintree.hosts.rebalance-load, which needs a swarm
+      "ALREADY RUNNING" and excludes "first placement of new pieces".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: I have a docs fix, a flaky test and a perf regression, and none of my machines has been picked yet; decide which host takes each by its free capacity
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s2-midrun-rebalance
+    category: routing-trap
+    note: >-
+      The mid-run capacity response: daintree.hosts.rebalance-load ("one machine is
+      swapping ... while others sit idle", "only that unstarted work placed on hosts with
+      room"), not daintree.hosts.place-work.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: One studio is pegged and swapping halfway through the run while the other sits idle, move the unstarted pieces off it
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s2-backlog-refill-hosts
+    category: routing-trap
+    note: >-
+      Refill across several hosts with merges here: daintree.hosts.drain-issue-backlog
+      ("keep both hosts' slots full until nothing is left", "while this machine ... picks
+      the issues and merges"), not daintree.hosts.place-work: drain-issue-backlog keeps
+      "one first placement of different pieces by load with no picks or merges between"
+      for place-work, and place-work excludes "issues worked through in successive
+      batches ... with picks and merges between".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Keep refilling the agent slots on both studios from the backlog, four each, and do the merges on this machine as their PRs go green
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.hosts.foundation]
+
+  # S3: a host without the project versus a host that has it.
+  - id: journey-s3-host-lacks-project
+    category: routing-trap
+    note: >-
+      The host has no copy yet: daintree.hosts.open-project-on-host ("get my repo onto my
+      other Mac", "the host's existing copy of the repository or a fresh clone"), not
+      daintree.hosts.delegate-to-host, which open-project-on-host keeps only for "work
+      sent to ... a host that already has the project".
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: my other Mac doesn't have this repo yet, get it onto that machine before anything is sent there
+    expect:
+      required: [daintree.hosts.open-project-on-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s3-host-has-project
+    category: routing-trap
+    note: >-
+      The host already has the project: daintree.hosts.delegate-to-host, which
+      daintree.hosts.open-project-on-host names for "work sent to ... a host that already
+      has the project". Phrased as briefing its assistant: "send the fix to the build box"
+      pulls daintree.hosts.reassign-host-work instead (measured 0.995), a boundary for the
+      host-preparation work to settle.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: The build box already has this project checked out; have its assistant fix the flaky test and bring back the branch
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  # S4: a coordinator restart, remote and local.
+  - id: journey-s4-remote-restart-reconcile
+    category: routing-trap
+    note: >-
+      An unplanned restart with a remote worker still going: daintree.hosts.recover-and-clean-up
+      ("rebuild where the work sent to each Remote Host stands after a restart ... and
+      whether to send one again"). Nothing was parked, so not daintree.hosts.park-swarm,
+      which excludes "an account of what happened while away".
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: My Shell restarted mid-run; reconcile with the agent still working on the build host and do not launch it a second time
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s4-resume-parked-remote-run
+    category: routing-trap
+    note: >-
+      A deliberate park, resumed: daintree.hosts.park-swarm ("my Shell restarted, pick the
+      parked remote run back up from its record"), not daintree.hosts.recover-and-clean-up.
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: I parked the cross-machine run before restarting; bring it back from the resume record I kept
+    expect:
+      required: [daintree.hosts.park-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s4-local-checkpoint-resume
+    category: routing-trap
+    note: >-
+      Picking a local run up from its checkpoint after a restart:
+      daintree.orchestration.status-and-resume ("from run checkpoints, live Daintree
+      state"), not daintree.orchestration.hand-off-orchestration, which excludes picking
+      up "a run yourself in a new session from its checkpoints".
+    host_state: {hosts: none}
+    messages:
+      - role: user
+        content: After the restart, resume the run from its saved checkpoint and don't relaunch the agents that are still going
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: journey-s4-coordinator-replaced
+    category: routing-trap
+    note: >-
+      The coordinator itself being replaced while the run goes on:
+      daintree.orchestration.hand-off-orchestration, not
+      daintree.orchestration.status-and-resume, which names it for passing "a live run's
+      coordination to a successor session".
+    host_state: {hosts: none}
+    messages:
+      - role: user
+        content: "I'm swapping coordinators: write up the state of the six running agents for a new session and let it take over from here"
+    expect:
+      required: [daintree.orchestration.hand-off-orchestration]
+      optional: [daintree.foundation]
+
+  # S5: an authorised answer versus a read-only inventory versus one question.
+  - id: journey-s5-answer-host-question
+    category: routing-trap
+    note: >-
+      Answering within what the person approved and bringing the rest:
+      daintree.hosts.supervise-swarm ("a remote host asking whether it may do something",
+      "a question answered within the person's request, decisions brought to the person"),
+      not daintree.hosts.survey-hosts, whose report sends nothing.
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: The assistant on one host is asking whether it may run the database migration; answer it within what I already approved and bring me anything else
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s5-readonly-what-needs-me
+    category: routing-trap
+    note: >-
+      Read-only inventory with an unreachable host: daintree.hosts.survey-hosts ("whether
+      anything waits on the person ... why a host this Shell lists cannot be reached",
+      "Nothing is sent"), not daintree.hosts.supervise-swarm, which answers.
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: Just tell me what is waiting on me across my hosts and which machine can't be reached, don't answer or start anything
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s5-one-question-one-host
+    category: routing-trap
+    note: >-
+      One question to one host's assistant: daintree.hosts.ask-host-assistant, not
+      daintree.hosts.survey-hosts, which it names for "why it cannot be reached or refuses".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Check with the assistant on the laptop host whether the release prep finished, and tell me what it says
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation]
+
+  # S6: draining versus cancelling, and cleanup on each side.
+  - id: journey-s6-stop-assigning-hosts
+    category: routing-trap
+    note: >-
+      Drain without cancelling on a cross-host backlog run: daintree.hosts.drain-issue-backlog
+      ("stop starting new work but let the running ones finish", asked mid-run), not
+      daintree.hosts.steer-swarm, which stops or calls the run off.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: No more new issues for the studios from the backlog, but let the agents already working there finish theirs
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s6-cancel-remote-now
+    category: routing-trap
+    note: >-
+      The explicit stop overrides pending steps: daintree.hosts.steer-swarm ("call off what
+      I sent to every machine but keep what they have done"), not
+      daintree.hosts.recover-and-clean-up, which it names for catching up or cleaning up.
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: Abort the remote job on every studio immediately, but don't throw away the commits they already made
+    expect:
+      required: [daintree.hosts.steer-swarm]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s6-local-cleanup-keep-dirty
+    category: routing-trap
+    note: >-
+      A teardown request in the person's own words, with dirty work kept:
+      daintree.orchestration.workspace-cleanup ("Use ONLY when the user explicitly asks to
+      tear down workspace state"), not daintree.orchestration.status-and-resume.
+    host_state: {hosts: none}
+    messages:
+      - role: user
+        content: clean up the panes and worktrees from that run, but keep any worktree with uncommitted changes
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: journey-s6-remote-cleanup-accounting
+    category: routing-trap
+    note: >-
+      Cleanup on the hosts with a per-host account: daintree.hosts.recover-and-clean-up
+      ("what each host removed and kept, and why"), not
+      daintree.orchestration.workspace-cleanup, which it names for "tearing down local
+      panes and worktrees".
+    host_state: {hosts: configured}
+    messages:
+      - role: user
+        content: Tear down the worktrees and panes our last run created over on the studios, and give me a per-machine list of what stayed and why
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: journey-s6-status-is-not-cleanup
+    category: routing-trap
+    note: >-
+      A state sweep is not permission to tear down: daintree.orchestration.status-and-resume,
+      and daintree.orchestration.workspace-cleanup ("never select this for a status
+      question") must not ride along.
+    host_state: {hosts: none}
+    messages:
+      - role: user
+        content: what is still running from the batch I started this morning
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
