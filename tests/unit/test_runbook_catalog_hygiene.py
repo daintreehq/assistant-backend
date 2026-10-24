@@ -482,9 +482,11 @@ def test_the_global_assistants_listing_gap_stays_visible() -> None:
 
 
 def test_the_runbooks_match_what_daintree_provisions_the_global_assistant() -> None:
-    """Native setup, captured from the app: the runbook server and its headers, the
-    instructions that drop the project Assistant's owned-to-unscoped translation, and
-    the checkpoint folder the foundation names, which is not the scratch folder."""
+    """Native setup as the app's own helpers generate it at the captured commit (a
+    configuration contract, not observed launch wiring): the runbook server and its
+    headers, the instructions that drop the project Assistant's owned-to-unscoped
+    translation, and the checkpoint folder the foundation names, which is not the
+    scratch folder."""
     catalog = load_catalog()
     foundation = catalog.get("daintree.foundation")
     assert foundation is not None

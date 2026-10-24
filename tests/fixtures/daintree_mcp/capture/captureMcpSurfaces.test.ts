@@ -1025,9 +1025,11 @@ describe("capture Daintree MCP surfaces", () => {
                 },
               }
             : {}),
-          // What Daintree provisions this assistant's CLI with besides the MCP
-          // (HelpSessionService): the runbook server, its headers, the
-          // runbook and checkpoint instructions, and the env its PTY gets.
+          // The configuration contract the app's own helpers generate for this
+          // assistant's CLI besides the MCP (HelpSessionService calls them at
+          // provision): the runbook server, its headers, the runbook and
+          // checkpoint instructions, and the env names its PTY gets. Not observed
+          // launch wiring.
           ...(spec.global
             ? {
                 native_setup: {

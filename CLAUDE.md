@@ -187,9 +187,9 @@ per session), and a caller that prints the whole result pays for both the text b
 
 **Runbooks name Daintree app MCP actions**, and `tests/fixtures/daintree_mcp/` is the
 authority on which exist and what each caller is offered: an agent pane (owned tools such as
-`terminal.sendCommandOwned`), the sidebar assistant (the unscoped `terminal.sendCommand`, and
-alone `host.list`/`host.call`), the projectless global Assistant (root tools only; every project
-through `host.call`, under an allow-list), what a Remote Host offers inside `host.call` (the relayed
+`terminal.sendCommandOwned`), the sidebar assistant (the unscoped `terminal.sendCommand` in its own project, and
+`host.list`/`host.call`), the projectless global Assistant (only `host.list`/`host.call`/`host.settings`;
+every project through `host.call`, under an allow-list), what a Remote Host offers inside `host.call` (the relayed
 surface: owned tools, no `host.*`), and an API-key client (no `notify`, no
 `terminal.notifyWhenIdle`). A `host.call` example is validated against both the call's surface
 and the relayed one of the same tier. The hygiene test checks

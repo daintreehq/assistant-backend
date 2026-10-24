@@ -67,7 +67,8 @@ At `1752ef90` its `tools/list` is **empty**: it is listed from the viewless help
 manifest, which carries no `host.*` entry, although dispatch admits the three root
 tools (`capture.notes`). The tests read the root tools' schemas from the help surface
 of the same Tool set and record the gap rather than hide it. `capture.native_setup`
-records what Daintree provisions its CLI with besides the MCP: the `daintree-runbooks`
+records the configuration contract the app's own helpers generate for its CLI besides the
+MCP (not observed launch wiring: the integration smoke still owes that): the `daintree-runbooks`
 server and its headers, the runbook instructions (owned tool names as written, through
 `host.call`), the checkpoint instructions, `DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR` (bucket
 `global`, kept across launches) and the scratch variable. These two files are
