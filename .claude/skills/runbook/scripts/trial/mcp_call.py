@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Call one tool on the ISOLATED Daintree's MCP with its API key (stdlib only).
 
-    mcp_call.py <mcp-url> <api-key-file> tools
+    mcp_call.py <mcp-url> <api-key-file | help-session.json> tools
     mcp_call.py <mcp-url> <api-key-file> <action-id> ['<json-args>']
 
 An API-key session gets the `external` surface (terminal.list, terminal.getOutput,
@@ -50,6 +50,9 @@ def main() -> int:
     args = json.loads(sys.argv[4]) if len(sys.argv) > 4 else {}
     with open(key_file) as fh:
         key = fh.read().strip()
+    # help-session.json: a help-session bearer the holder provisioned on the Shell.
+    if key_file.endswith(".json"):
+        key = json.loads(key)["token"]
     init = {
         "jsonrpc": "2.0",
         "id": 1,
