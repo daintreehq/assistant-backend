@@ -131,6 +131,12 @@ topic_shifts:
     active: [daintree.worktree.manage-resource]
 
 boundaries:
+  - query: the studio Mac isn't a host yet; get it added over ssh so I can bring this project to it afterwards
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
+  - query: the build server shows unreachable in Hosts, sort out the connection before anything gets prepared on it
+    confusable_with: [daintree.hosts.prepare-project-for-work]
+    run: runbook-2026-10-24-issue-169
   - query: daintree on this mac can't reach my newly added host, it just says unreachable
     confusable_with: [daintree.diagnostics]
   - query: is something broken? the host I added keeps flipping between connecting and not connected
