@@ -27,7 +27,6 @@ positives:
   # --- users in their own words
   - open this project on my mac mini
   - i want my branch on the other computer, it hasn't been pushed yet
-  - use the copy that's already on the server rather than cloning again
   - open it on the build server and leave this window alone
   - I'd like to carry on with this project from my second laptop, which Daintree already has as a host. Can you start that for me?
   - the host cloned the repo into the wrong folder last time, this time let me pick where
@@ -49,8 +48,6 @@ boundaries:
   - query: the Linux server shows Connected in the Hosts list, so now I want this repo open on it
     confusable_with: [daintree.hosts.connect-host]
   - query: clone this repo onto the box and open it there, getting assistants running on it can be a later step
-    confusable_with: [daintree.hosts.delegate-to-host]
-  - query: put the project on the desk machine so I can pick the work up there myself later
     confusable_with: [daintree.hosts.delegate-to-host]
   - query: check this branch out for me on the other machine's copy
     confusable_with: [daintree.worktree.create-plain-worktree]

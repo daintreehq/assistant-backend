@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
   "rows": 21790,
-  "compiled_sha256": "67246612ef8d5d89cf85bd764916806078689e37c075c29e727cea568542f02b",
+  "compiled_sha256": "210281d604042b0e47f5b289d734c5eacdef12befcf38fb9e6f7da7e2e97892b",
   "label_space_sha256": "85d8b28344be8917aac3d1f542b6bc22951a854d15060241c2ff363f78a8badc",
   "label_space_size": 146,
   "by_source": {
@@ -42,7 +42,7 @@
     "pre-split": 9073,
     "runbook-2026-10-19-choose-agent-model": 59,
     "runbook-2026-10-24-answer-assistant-questions": 45,
-    "runbook-2026-10-24-issue-169": 68,
+    "runbook-2026-10-24-issue-169": 70,
     "runbook-2026-10-24-issue-171": 46,
     "runbook-2026-10-coordinator": 2,
     "runbook-2026-10-issue-100": 10,
@@ -67,7 +67,7 @@
     "runbook-2026-10-issue-120": 88,
     "runbook-2026-10-issue-121": 78,
     "runbook-2026-10-issue-122": 83,
-    "runbook-2026-10-issue-123": 68,
+    "runbook-2026-10-issue-123": 66,
     "runbook-2026-10-issue-124": 79,
     "runbook-2026-10-issue-125": 76,
     "runbook-2026-10-issue-126": 79,
@@ -479,10 +479,10 @@
       "sha256": "66e4ba1b05490b2642238bedd0e462388277d5481b9cd238bbb72509ed7dea15"
     },
     "runbooks/daintree.hosts.open-project-on-host.yaml": {
-      "examples": 63,
-      "rows": 63,
+      "examples": 61,
+      "rows": 61,
       "runbook": "daintree.hosts.open-project-on-host",
-      "sha256": "15f2808250e2d1b91926769a57b7adf168d578d951f499a97f04665ec51c7f90"
+      "sha256": "7f0f72954f909658fb81230bb6c8ddcef9a2574faa3ab76ed746f438536c0537"
     },
     "runbooks/daintree.hosts.park-swarm.yaml": {
       "examples": 78,
@@ -503,10 +503,10 @@
       "sha256": "9c490cda961aa7a6080c7e8e03454152d61b311fcbaeb4f7b3183cdb0039e627"
     },
     "runbooks/daintree.hosts.prepare-project-for-work.yaml": {
-      "examples": 55,
-      "rows": 55,
+      "examples": 57,
+      "rows": 57,
       "runbook": "daintree.hosts.prepare-project-for-work",
-      "sha256": "39d265c6c463e5323c656140c52e8ac343a6fa14ef2eafe6fd93863bc9a3750d"
+      "sha256": "64117613da17e5dc963ad828ed9f273e0598008e1d109dd19207f69b178ab6f7"
     },
     "runbooks/daintree.hosts.prepare-remote-demo.yaml": {
       "examples": 66,

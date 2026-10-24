@@ -44,6 +44,7 @@ positives:
   - put this project on my other mac but don't touch what's already there
   - bring this repo over to the workstation in the garage
   - put my notes repo on the pi
+  - use the copy that's already on the server rather than cloning again
   - hi! hope you're well. I've got the server set up as a host, could you get this project over there?
   - query: I want my repo on the studio server, can you do that?
     history:
@@ -51,6 +52,8 @@ positives:
       - "assistant: Good. Tell me the project and I can help with the next step."
 
 boundaries:
+  - query: put the project on the desk machine so I can pick the work up there myself later
+    confusable_with: [daintree.hosts.delegate-to-host, daintree.hosts.open-project-on-host]
   - query: no window needed on the build server, just have the project there so I can hand it work
     confusable_with: [daintree.hosts.open-project-on-host]
   - query: skip the transfer dialog and make sure the repo is on the other Mac for an agent
