@@ -260,6 +260,12 @@ boundaries:
   - query: pull together what each remote host produced for the run and which ones never answered, a single roundup please
     confusable_with: [daintree.security.respond-to-secret-exposure]
     run: runbook-2026-10-issue-140
+  - query: 'keep the run on the studios going and answer the workers'' questions inside the brief'
+    confusable_with: [daintree.hosts.answer-assistant-questions]
+    run: runbook-2026-10-24-answer-assistant-questions
+  - query: 'the units I sent to the hosts are asking things, keep them moving until they all finish'
+    confusable_with: [daintree.hosts.answer-assistant-questions]
+    run: runbook-2026-10-24-answer-assistant-questions
 followups:
   - query: great, stay on it till they're all done, I only want to hear about decisions
     history:

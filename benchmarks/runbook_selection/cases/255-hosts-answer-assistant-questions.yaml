@@ -1,0 +1,210 @@
+# daintree.hosts.answer-assistant-questions: the sweep over Daintree Assistants (this
+# project, this machine's other projects, the Remote Hosts) that answers what the person
+# already decided and batches the rest. Pinned by DELIVERABLE against its neighbours:
+# daintree.hosts.survey-hosts reads and answers nothing (plain inventory, resting
+# prompts); daintree.hosts.supervise-swarm follows a run's units to its end (worker-only
+# supervision); daintree.agents.answer-waiting-agent answers ordinary agent panes;
+# daintree.hosts.ask-host-assistant puts a new question to one host's assistant;
+# daintree.orchestration.status-and-resume reconstructs earlier work. Traps run both ways.
+
+cases:
+  - id: assistant-questions-every-host-decisions
+    category: single-runbook
+    note: >-
+      The issue's first request. Decided by "which assistants need them across projects
+      and machines" and "bringing every other question, approval or choice to them in one
+      batch".
+    messages:
+      - role: user
+        content: Go through my assistants on every host and bring me the decisions you need.
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-answer-project-assistants
+    category: single-runbook
+    note: >-
+      The issue's second request. Decided by "answering the questions the person's earlier
+      instructions or agreed plan already cover".
+    messages:
+      - role: user
+        content: Answer what you can for my project assistants and show me the rest.
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-unblock-covered-by-plan
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "which assistants need them" and "earlier
+      instructions or agreed plan already cover".
+    messages:
+      - role: user
+        content: Which assistants need me, and can you unblock the ones covered by our plan?
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-agent-phrased-sweep
+    category: single-runbook
+    note: >-
+      Agent-written outcome. Decided by "Daintree Assistants gone through for what they are
+      asking" and "each assistant handled once".
+    messages:
+      - role: user
+        content: >-
+          Check each Daintree Assistant across the local projects and remote hosts for a
+          pending question, reply where the user's earlier decisions settle it, and list
+          the open decisions with host and project for the user
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-casual-anyone-stuck
+    category: single-runbook
+    note: >-
+      Casual, no punctuation. Decided by "which assistants need them" with answering
+      implied by "sort out".
+    messages:
+      - role: user
+        content: are any of my daintree assistants stuck on a question for me sort out the ones you can
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-not-survey
+    category: routing-trap
+    note: >-
+      Answering, not a read-only report: "Do not use for a read-only report of the hosts
+      that answers nothing (daintree.hosts.survey-hosts)". survey-hosts riding along is an
+      extra.
+    messages:
+      - role: user
+        content: Look at what each assistant across my machines is asking and reply to the ones I already settled this morning, then give me the leftovers
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-not-supervise-swarm
+    category: routing-trap
+    note: >-
+      Every assistant, not the units of a run this Shell sent out: "questions from the
+      units of a run this Shell sent out and is following to its end
+      (daintree.hosts.supervise-swarm)". supervise-swarm riding along is an extra.
+    messages:
+      - role: user
+        content: Not the swarm, I mean the project assistants themselves on each machine. Which ones are waiting on me, and answer any I already decided
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-not-answer-waiting-agent
+    category: routing-trap
+    note: >-
+      Daintree Assistants across projects, not ordinary agent panes: "ordinary agent panes
+      on any machine, named or found in a status read (daintree.agents.answer-waiting-agent)".
+      answer-waiting-agent riding along is an extra.
+    messages:
+      - role: user
+        content: My Daintree Assistants in the other projects have questions piling up. Answer the ones our plan covers and batch the rest for me.
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-not-ask-host-assistant
+    category: routing-trap
+    note: >-
+      Questions the assistants already have, not a new one put to one host: "a new
+      question for one host's assistant (daintree.hosts.ask-host-assistant)". ask-host-
+      assistant riding along is an extra.
+    messages:
+      - role: user
+        content: The assistants on my remote hosts are asking me things. Reply to whatever I've already answered before and tell me what still needs me.
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-not-status-and-resume
+    category: routing-trap
+    note: >-
+      Questions waiting now, not reconstructing earlier work: "catching up on earlier work
+      after a break (daintree.orchestration.status-and-resume)". status-and-resume riding
+      along is an extra.
+    messages:
+      - role: user
+        content: Before I pick anything back up, clear the questions my assistants are holding for me where the answer's already agreed, and show me the decisions left
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-reverse-plain-inventory
+    category: routing-trap
+    note: >-
+      Plain inventory, nothing answered: survey-hosts' "which projects have an assistant
+      running" and "Nothing is sent". The sweep riding along is an extra.
+    messages:
+      - role: user
+        content: Which projects on my other machines have an assistant running right now? Just tell me, don't send anything.
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-reverse-resting-prompt
+    category: routing-trap
+    note: >-
+      A resting prompt is not a question: which assistants are free is survey-hosts' "which
+      machines can take work right now". The sweep riding along is an extra.
+    messages:
+      - role: user
+        content: which assistants on the remote hosts are sitting idle at their prompt and could take work
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-reverse-worker-supervision
+    category: routing-trap
+    note: >-
+      Worker-only supervision of a run already out: supervise-swarm's "keep the swarm going
+      and answer what you can". The sweep riding along is an extra.
+    messages:
+      - role: user
+        content: The workers I sent to the studios are still going. Keep the run moving, answer what they ask within the brief, and tell me when they're all done.
+    expect:
+      required: [daintree.hosts.supervise-swarm]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-reverse-pane-agents
+    category: routing-trap
+    note: >-
+      Ordinary agent panes waiting on a question: answer-waiting-agent's "three of them are
+      waiting on questions, unblock them". The sweep riding along is an extra.
+    messages:
+      - role: user
+        content: three of the claude panes I launched are waiting on questions, tell them yes and report what they do
+    expect:
+      required: [daintree.agents.answer-waiting-agent]
+      optional: [daintree.foundation]
+
+  - id: assistant-questions-reverse-ask-one-host
+    category: routing-trap
+    note: >-
+      One new question to one host's assistant: ask-host-assistant's "ONE QUESTION answered
+      by the Daintree assistant on ANOTHER MACHINE". The sweep riding along is an extra.
+    messages:
+      - role: user
+        content: ask the assistant on the build box whether the release prep is finished and tell me what it says
+    expect:
+      required: [daintree.hosts.ask-host-assistant]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-reverse-where-were-we
+    category: routing-trap
+    note: >-
+      Reconstructing earlier work after a break: status-and-resume's "where were we, what
+      was I working on, catch me up". The sweep riding along is an extra.
+    messages:
+      - role: user
+        content: I've been away since Thursday. Where were we, and what's still in flight from before?
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]

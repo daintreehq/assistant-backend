@@ -191,3 +191,9 @@ boundaries:
   - query: "check with the build box which port its worktree dev servers bind and tell me what it says, don't change anything"
     confusable_with: [daintree.worktree.provision-local-environment]
     run: runbook-2026-10-issue-132
+  - query: 'ask the assistant on the linux box what it thinks of the failing build and tell me'
+    confusable_with: [daintree.hosts.answer-assistant-questions]
+    run: runbook-2026-10-24-answer-assistant-questions
+  - query: 'put one question to the remote host''s assistant: is the migration done'
+    confusable_with: [daintree.hosts.answer-assistant-questions]
+    run: runbook-2026-10-24-answer-assistant-questions
