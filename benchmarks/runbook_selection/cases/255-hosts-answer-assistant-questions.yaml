@@ -19,7 +19,7 @@ cases:
         content: Go through my assistants on every host and bring me the decisions you need.
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-answer-project-assistants
     category: single-runbook
@@ -31,7 +31,7 @@ cases:
         content: Answer what you can for my project assistants and show me the rest.
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-unblock-covered-by-plan
     category: single-runbook
@@ -43,7 +43,7 @@ cases:
         content: Which assistants need me, and can you unblock the ones covered by our plan?
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-agent-phrased-sweep
     category: single-runbook
@@ -58,7 +58,7 @@ cases:
           the open decisions with host and project for the user
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-casual-anyone-stuck
     category: single-runbook
@@ -70,7 +70,7 @@ cases:
         content: are any of my daintree assistants stuck on a question for me sort out the ones you can
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-not-survey
     category: routing-trap
@@ -83,7 +83,7 @@ cases:
         content: Look at what each assistant across my machines is asking and reply to the ones I already settled this morning, then give me the leftovers
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-not-supervise-swarm
     category: routing-trap
@@ -96,7 +96,7 @@ cases:
         content: Not the swarm, I mean the project assistants themselves on each machine. Which ones are waiting on me, and answer any I already decided
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-not-answer-waiting-agent
     category: routing-trap
@@ -109,7 +109,7 @@ cases:
         content: My Daintree Assistants in the other projects have questions piling up. Answer the ones our plan covers and batch the rest for me.
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-not-ask-host-assistant
     category: routing-trap
@@ -122,7 +122,7 @@ cases:
         content: The assistants on my remote hosts are asking me things. Reply to whatever I've already answered before and tell me what still needs me.
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-not-status-and-resume
     category: routing-trap
@@ -135,7 +135,7 @@ cases:
         content: Before I pick anything back up, clear the questions my assistants are holding for me where the answer's already agreed, and show me the decisions left
     expect:
       required: [daintree.hosts.answer-assistant-questions]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-reverse-plain-inventory
     category: routing-trap
@@ -147,7 +147,7 @@ cases:
         content: Which projects on my other machines have an assistant running right now? Just tell me, don't send anything.
     expect:
       required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-reverse-resting-prompt
     category: routing-trap
@@ -159,7 +159,7 @@ cases:
         content: which assistants on the remote hosts are sitting idle at their prompt and could take work
     expect:
       required: [daintree.hosts.survey-hosts]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-reverse-worker-supervision
     category: routing-trap
@@ -171,7 +171,7 @@ cases:
         content: The workers I sent to the studios are still going. Keep the run moving, answer what they ask within the brief, and tell me when they're all done.
     expect:
       required: [daintree.hosts.supervise-swarm]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
 
   - id: assistant-questions-reverse-pane-agents
     category: routing-trap
@@ -195,4 +195,16 @@ cases:
         content: ask the assistant on the build box whether the release prep is finished and tell me what it says
     expect:
       required: [daintree.hosts.ask-host-assistant]
-      optional: [daintree.hosts.foundation]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: assistant-questions-reverse-where-were-we
+    category: routing-trap
+    note: >-
+      Reconstructing earlier work after a break: status-and-resume's "where were we, what
+      was I working on, catch me up". The sweep riding along is an extra.
+    messages:
+      - role: user
+        content: I've been away since Thursday. Where were we, and what's still in flight from before?
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]

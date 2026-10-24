@@ -491,6 +491,12 @@ boundaries:
   - query: where did last night's issue waves get to? i'm back after a restart and just need the picture
     confusable_with: [daintree.orchestration.work-in-waves]
     run: 2026-10-16-synthetic-audit
+  - query: 'back after a week off, catch me up on what my agents and assistants were doing and what''s still open'
+    confusable_with: [daintree.hosts.answer-assistant-questions]
+    run: runbook-2026-10-24-answer-assistant-questions
+  - query: 'I restarted Daintree overnight, reconstruct which of yesterday''s runs are still in progress before I answer anything'
+    confusable_with: [daintree.hosts.answer-assistant-questions]
+    run: runbook-2026-10-24-answer-assistant-questions
 followups:
   - query: adopt that one
     history:

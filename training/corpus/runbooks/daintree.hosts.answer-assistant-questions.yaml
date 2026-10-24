@@ -28,6 +28,7 @@ positives:
   - 'Look across the assistants in my local projects and on the remote host, and bring me the choices only I can make'
   - 'work through what each assistant is asking, one answer each, and tell me which ones went through'
   - 'answer my assistants for me where it''s obvious from what I said, flag anything risky'
+  - 'one of the assistants in the api project is asking whether to bump the minor version, I said yes earlier, tell it'
 
 boundaries:
   - query: 'Go through every assistant on my machines, answer what you can from my notes, and tell me which hosts you couldn''t reach'

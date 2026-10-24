@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "generated_by": "python -m training.compile_corpus",
-  "rows": 21737,
-  "compiled_sha256": "72eb9ee7e6a4fbbc32303c4b11a088b767f444533dfffe718b800d50d03cfe4d",
+  "rows": 21740,
+  "compiled_sha256": "05e49d1822f7c663732cc3f2af22a0f9e957bc08c1c47fa5454dce115ac9f21f",
   "label_space_sha256": "8dc46d465e4bef31a7350cadc0ceabc6256423c563e109c989eab72bec082bc6",
   "label_space_size": 145,
   "by_source": {
-    "boundary": 7176,
+    "boundary": 7178,
     "docs": 882,
     "followup": 1012,
     "foundation": 432,
@@ -16,7 +16,7 @@
     "no_task": 118,
     "no_task_stateful": 567,
     "off_domain": 210,
-    "positive": 7412,
+    "positive": 7413,
     "topic_shift": 2878,
     "wake": 131
   },
@@ -41,7 +41,7 @@
     "2026-10-16-synthetic-audit": 637,
     "pre-split": 9073,
     "runbook-2026-10-19-choose-agent-model": 59,
-    "runbook-2026-10-24-answer-assistant-questions": 42,
+    "runbook-2026-10-24-answer-assistant-questions": 45,
     "runbook-2026-10-24-issue-171": 46,
     "runbook-2026-10-coordinator": 2,
     "runbook-2026-10-issue-100": 10,
@@ -382,10 +382,10 @@
       "sha256": "43dbcaf32fb01a96bd239fea8e50e53bea9054b4719e3eaf09efa56ce536e62e"
     },
     "runbooks/daintree.hosts.answer-assistant-questions.yaml": {
-      "examples": 33,
-      "rows": 33,
+      "examples": 34,
+      "rows": 34,
       "runbook": "daintree.hosts.answer-assistant-questions",
-      "sha256": "882dcc9366f7f1b85d8f82f7d96eb63c9ba07c47d0be312b48431cfcbddb44b3"
+      "sha256": "e7b67df48b2bc667818a6e5e36a1e958814cf9986bd4307f1ec369e3a359242b"
     },
     "runbooks/daintree.hosts.ask-host-assistant.yaml": {
       "examples": 88,
@@ -742,10 +742,10 @@
       "sha256": "aaa921712b9ef547fafdbe9b1e27bfcf365365810a745e7e6dfe3d6c32efb790"
     },
     "runbooks/daintree.orchestration.status-and-resume.yaml": {
-      "examples": 327,
-      "rows": 327,
+      "examples": 329,
+      "rows": 329,
       "runbook": "daintree.orchestration.status-and-resume",
-      "sha256": "cd2fb316732a4b9e8344de6de542f62b07e2961899024cf6ed92040620fbb126"
+      "sha256": "230ea260dcb53479427fe3dd7fd288680a1aa0c1807005417f3bc11f8632e222"
     },
     "runbooks/daintree.orchestration.supervise-fleet.yaml": {
       "examples": 295,
