@@ -1,0 +1,161 @@
+# daintree.hosts.configure-settings: from this Shell, read a named Daintree setting on Remote
+# Hosts, or change it on the hosts named through host.settings (read, preview, one approval in
+# the person's dialog, apply once), Canopy on across several hosts among them. Recall cases in
+# agents' and users' words (the issue's three requests among them, machine names generalised);
+# a routing trap per declared neighbour where this runbook wins (daintree.hosts.copy-portable-settings,
+# daintree.hosts.survey-hosts, daintree.hosts.connect-host, daintree.hosts.open-project-on-host);
+# reverse traps where copy-portable-settings and survey-hosts win and this one must not ride
+# along; and the Canopy view filter, which is no host setting at all. Written without a
+# selector model on the authoring machine: unmeasured until bench local runs.
+
+cases:
+  - id: configure-settings-agent-canopy-all-hosts
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome. Decided by "turn Canopy on, off or hidden on all their hosts or the
+      ones named" and "one preview the person approves once for the listed hosts, applied once".
+    messages:
+      - role: user
+        content: >-
+          Turn Canopy on across every Remote Host with a single approval from the person, then
+          report which hosts took it and which were refused or unreachable
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-issue-enable-canopy-all
+    category: single-runbook
+    note: The issue's first request. Decided by "turn Canopy on, off or hidden on all their hosts".
+    messages:
+      - role: user
+        content: Enable Canopy on all connected hosts.
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-issue-read-then-change
+    category: single-runbook
+    note: >-
+      The issue's second request, machine name generalised. Decided by "what a host has set for
+      one of these now; or change just that setting".
+    messages:
+      - role: user
+        content: Read the idle terminal notification setting on the second studio, then change just that setting.
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-issue-named-setting-which-took
+    category: single-runbook
+    note: >-
+      The issue's third request. Decided by "change just that setting and say which hosts took
+      it".
+    messages:
+      - role: user
+        content: Use the remote connection to change this named setting on my studios and show which ones took it.
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-user-default-agent
+    category: single-runbook
+    note: Casual user line. Decided by "which agent a host starts by default".
+    messages:
+      - role: user
+        content: make codex the default agent on both linux boxes
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-trap-copy-one-key
+    category: routing-trap
+    note: >-
+      One named value on a host, not a category copy from this machine. Decided by "one of the
+      HOST SETTINGS Daintree can change from here read or changed on their other machines" and "a host's alert about idle terminals
+      and its minutes"; daintree.hosts.copy-portable-settings fences "one named setting read or
+      changed by key on hosts" back here.
+    messages:
+      - role: user
+        content: On the build host, set the idle alert to sixty minutes and leave every other setting there alone
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-trap-survey-canopy-state
+    category: routing-trap
+    note: >-
+      A read of one named setting across hosts, not the connection/load/agents report. Decided by
+      "what a host has set for one of these now"; daintree.hosts.survey-hosts fences "a named
+      setting read or changed on hosts, Canopy among them" back here.
+    messages:
+      - role: user
+        content: Which of my hosts have Canopy turned on right now?
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-trap-connect-then-canopy
+    category: routing-trap
+    note: >-
+      The hosts are already connected; the ask is a setting on them. Decided by "turn Canopy on
+      ... on all their hosts", fenced from "adding a machine or one that will not connect
+      (daintree.hosts.connect-host)".
+    messages:
+      - role: user
+        content: Both new machines show as connected now, so switch Canopy on for each of them
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-trap-open-project-default-agent
+    category: routing-trap
+    note: >-
+      A host setting before any project goes there. Decided by "which agent a host starts by
+      default", fenced from "putting this project on a host (daintree.hosts.open-project-on-host)".
+    messages:
+      - role: user
+        content: Before I open anything on the new server, set the agent it starts by default to Claude
+    expect:
+      required: [daintree.hosts.configure-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-reverse-copy-categories
+    category: routing-trap
+    note: >-
+      Categories pushed from this machine: daintree.hosts.copy-portable-settings owns "put this
+      machine's Daintree settings (agent flags and presets, notification preferences, recipes,
+      theme) on a Remote Host"; this runbook fences "copying this machine's setting categories
+      to a host" away.
+    messages:
+      - role: user
+        content: Push my agent presets and recipes from this laptop over to the build host
+    expect:
+      required: [daintree.hosts.copy-portable-settings]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-reverse-survey-load
+    category: routing-trap
+    note: >-
+      Connection, load and agents: daintree.hosts.survey-hosts owns "how busy each is ... what is
+      running on them"; this runbook fences "a read-only report of the hosts' connection, load and
+      agents" away.
+    messages:
+      - role: user
+        content: How busy is each of my hosts and which agents are running on them?
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation]
+
+  - id: configure-settings-reverse-canopy-view-filter
+    category: routing-trap
+    note: >-
+      Which hosts' cards Canopy lists is Canopy's own view filter, not any host's canopyMode: no
+      host setting changes and no procedure is owed ("Canopy's filter of which hosts' cards it shows
+      is not canopyMode: never change a host to change a view"). Nothing from
+      the hosts procedures loads; the foundations may ride along.
+    messages:
+      - role: user
+        content: In Canopy, show only the build server's cards instead of every host
+    expect:
+      required: []
+      optional: [daintree.hosts.foundation, daintree.foundation]

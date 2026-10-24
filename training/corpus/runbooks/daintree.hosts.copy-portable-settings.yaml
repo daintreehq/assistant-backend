@@ -109,9 +109,15 @@ boundaries:
   - query: Show what a settings copy to the second host would change, since the plugin list there is already how I want it.
     confusable_with: [daintree.plugins.develop-project-plugin]
     run: runbook-2026-10-issue-137
-  - query: "set the other machine's default agent to the same one I use here"
-    confusable_with: [daintree.agents.choose-agent-model]
-    run: runbook-2026-10-19-choose-agent-model
+  - query: copy all my notification preferences to the host, not just the idle alert
+    confusable_with: [daintree.hosts.configure-settings]
+    run: runbook-2026-10-24-issue-171
+  - query: bring this laptop's agent presets and recipes over to the server in one go
+    confusable_with: [daintree.hosts.configure-settings]
+    run: runbook-2026-10-24-issue-171
+  - query: make the remote host match this machine's Daintree settings, every default category
+    confusable_with: [daintree.hosts.configure-settings]
+    run: runbook-2026-10-24-issue-171
 followups:
   - query: ok now bring my settings across too
     history:

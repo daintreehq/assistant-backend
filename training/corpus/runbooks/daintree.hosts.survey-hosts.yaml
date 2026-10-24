@@ -296,6 +296,15 @@ boundaries:
   - query: why can't I reach the assistant on my second mac to ask it anything, even its usage
     confusable_with: [daintree.agents.check-usage-limits, daintree.hosts.foundation]
     run: 2026-10-16-synthetic-audit
+  - query: which of my hosts are busy and which can take an agent, never mind their settings
+    confusable_with: [daintree.hosts.configure-settings]
+    run: runbook-2026-10-24-issue-171
+  - query: are all my remote machines connected and what is running on each
+    confusable_with: [daintree.hosts.configure-settings]
+    run: runbook-2026-10-24-issue-171
+  - query: the server refuses calls with opted_out; which setting does the person change
+    confusable_with: [daintree.hosts.configure-settings]
+    run: runbook-2026-10-24-issue-171
 followups:
   - query: which of those have no assistant at all?
     history:
