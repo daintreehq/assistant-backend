@@ -1,0 +1,111 @@
+# Placement and refill by free capacity across the Remote Hosts: the requests go to the
+# owner whose deliverable they name. First placement of different pieces is
+# daintree.hosts.place-work; a backlog kept going on the chosen hosts with refills is
+# daintree.hosts.drain-issue-backlog; moving queued work off a pressured host in a running
+# swarm is daintree.hosts.rebalance-load. Traps: a fixed batch on one named host, a
+# read-only capacity question, and moving an agent that already started. The hosts
+# foundation may ride along (optional).
+
+cases:
+  # ------------------------------------------------------------------- recall
+  - id: capacity-place-spread-free
+    category: single-runbook
+    note: >-
+      The issue's first request. Different tasks, no host per task chosen, placed by the
+      room each host has: place-work's "wants each put on whichever Remote Host this Shell
+      reaches can best take it".
+    messages:
+      - role: user
+        content: Spread these tasks across my studios using the capacity they have free.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: capacity-drain-keep-full
+    category: single-runbook
+    note: >-
+      The issue's second request. A backlog kept going on hosts already chosen, refilled
+      until done: drain-issue-backlog's "keep both hosts' slots full until nothing is
+      left". Holding launches under memory pressure is its load rule, not a rebalance.
+    messages:
+      - role: user
+        content: Keep the chosen hosts full until the backlog is done, but stop launching under memory pressure.
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.hosts.foundation]
+
+  - id: capacity-rebalance-queued
+    category: single-runbook
+    note: >-
+      The issue's third request. Queued work moved, started agents left in place:
+      rebalance-load's "release the pieces it has not started, move only that unstarted
+      work".
+    messages:
+      - role: user
+        content: Rebalance the queued work without moving agents that are already running.
+    expect:
+      required: [daintree.hosts.rebalance-load]
+      optional: [daintree.hosts.foundation]
+
+  - id: capacity-place-agent-phrased
+    category: single-runbook
+    note: >-
+      Agent-phrased outcome for first placement by measured capacity, with caps the person
+      set: place-work, not the drain (no picks or merges between batches).
+    messages:
+      - role: user
+        content: Place six independent tasks on the person's two connected Remote Hosts by idle cores and available memory, at most three per host, and show the placement before launching
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  - id: capacity-place-refill-no-merge
+    category: single-runbook
+    note: >-
+      Different tasks placed and the slots refilled as they free, with no picks from a
+      backlog and no merges: place-work's "Initial placement, and each refill of it", not
+      drain-issue-backlog (picks and merges between batches) or supervise-swarm (nothing
+      refilled).
+    messages:
+      - role: user
+        content: Put these ten tasks on my two hosts, two at a time each, and start the next one on a host whenever a slot frees; don't merge anything.
+    expect:
+      required: [daintree.hosts.place-work]
+      optional: [daintree.hosts.foundation]
+
+  # ------------------------------------------------------------------- traps
+  - id: capacity-trap-single-host-waves
+    category: routing-trap
+    note: >-
+      Every issue on ONE machine the person named, in merge-gated waves: place-work's
+      fence sends this to daintree.orchestration.work-in-waves; no cross-host placement.
+    messages:
+      - role: user
+        content: Run these nine issues on the linux box only, three at a time, and merge each wave before starting the next.
+    expect:
+      required: [daintree.orchestration.work-in-waves]
+      optional: [daintree.foundation, daintree.hosts.foundation]
+
+  - id: capacity-trap-survey-read-only
+    category: routing-trap
+    note: >-
+      Which machine has room, asked for a report only: survey-hosts's "which machines can
+      take work right now" with "Nothing is sent, started or recovered". Not place-work.
+    messages:
+      - role: user
+        content: Which of my machines has free cores and memory right now? Just tell me, don't start anything.
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation]
+
+  - id: capacity-trap-move-started-agent
+    category: routing-trap
+    note: >-
+      One unit that already started, moved to another machine on the person's word:
+      reassign-host-work. rebalance-load moves only work not started.
+    messages:
+      - role: user
+        content: The agent already working on the parser fix is stuck on the studio under memory pressure; move that unit to the other host and keep what it pushed.
+    expect:
+      required: [daintree.hosts.reassign-host-work]
+      optional: [daintree.hosts.foundation]
