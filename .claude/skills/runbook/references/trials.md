@@ -227,10 +227,11 @@ and stays inside the size budgets.
   exercised by the app's own harness (`npm run test:e2e:assistant` in `$APP_REPO`,
   with `DAINTREE_RUNBOOKS_MCP_URL` pointing at the runbook server). It builds into the
   user's checkout, so run it only with the user's say-so.
-- **Remote Host procedures** follow `references/host-control-trials.md`. The pane
-  harness cannot prove help-to-relay behavior; record the exact outstanding live
-  scenario in `$W/trials/owed.md`. Frozen inbox trial plans are archived and cannot
-  stand in for evidence about current host control.
+- **Remote Host procedures** follow `references/host-control-trials.md`: `up --hosts N`
+  adds isolated Remote Hosts and starts the Shell's own assistant, the caller
+  `trial --assistant` prompts. A pane trial cannot prove help-to-relay behavior; what the
+  rig cannot show goes to `$W/trials/owed.md`. Frozen inbox trial plans are archived and
+  cannot stand in for evidence about current host control.
 - **Headless runs are not trials.** `claude -p` or `codex exec` outside a pane cannot
   receive notices; use them only for routing questions, and `bench search` is better
   for those.

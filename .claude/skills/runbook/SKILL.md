@@ -492,10 +492,15 @@ corpus rows stay, the retrain is owed, the prose stops.
   is for, and either a second scenario (the stop-and-ask case, a different branch of
   the procedure) or, with `--codex-trial` or when the issue asks for Codex, a Codex
   pane. A third trial only to confirm a body fix.
-- **Not trialable** (a sidebar-only caller, Remote Hosts, other machines, accounts):
-  record the owed run in `$W/trials/owed.md`: who can run it, where, the exact
-  prompts, and what to check, against today's help and relayed surfaces. The old
-  inbox trial planner is archived and does not validate direct host control.
+- **Host trials** (`daintree.hosts.*`, a sidebar-assistant caller, Remote Hosts): on
+  macOS, run them on the live host rig (`dtrb.sh up --hosts N`, then
+  `trial --assistant` and `mcp --as help`; `references/host-control-trials.md` says
+  what it can and cannot show).
+- **Not trialable** (the global Assistant caller, a real second machine or capacity
+  difference, Linux hosts, accounts): record the owed run in `$W/trials/owed.md`: who
+  can run it, where, the exact prompts, and what to check, against today's help and
+  relayed surfaces. The old inbox trial planner is archived and does not validate
+  direct host control.
   If the issue's "Done when" requires a live trial, the PR says `Part of #N`.
 
 Run, judge and classify each trial (RUNBOOK / MODEL / ROUTING / APP / HARNESS). Fix
