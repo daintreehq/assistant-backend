@@ -11,8 +11,9 @@ It holds no secret, calls no upstream, and keeps no state between requests. The
 only other routes are `/health`, `/healthz`, `/readyz`, `/version` (build metadata
 only) and a redirect at `/`.
 
-The deployment is `cloudbuild.yaml`: pushing to `main` builds an image, raises a
-no-traffic candidate, smokes it, promotes it, and retires the candidate's URL.
+The deployment is `cloudbuild.yaml`: pushing to `main` builds an image, qualifies
+its catalog and model, raises a no-traffic candidate, smokes it, promotes it, and
+retires the candidate's URL.
 Nothing is built or pushed from a developer machine. The scripts here support
 that pipeline — they do not replace it.
 
@@ -60,7 +61,22 @@ Public smoke testing needs only `bash`, `curl` and Python, with an explicit URL:
    `selector.lock` names each file by SHA-256 and the bucket holding it, and
    `fetch-selector` downloads them and checks every byte against the lock, so a
    missing or altered file fails the build. No secret is read.
-4. **`deploy-rc`** validates `_ENVIRONMENT` (`development|test|staging|production`)
+   **`qualify`, `qualify-record`** (between `build` and `push`, neither allowed to
+   fail) run `benchmarks/qualify_release.py` in the Dockerfile's `qualify`
+   stage: the builder's venv the runtime copies, so the installed catalog and
+   selector on the production Linux runtime. It checks the installed model files
+   against `selector.lock`, runs the serving tests (`QUALIFYING_TESTS`: catalog,
+   hygiene, dependencies, document budgets, MCP surfaces and contract, search
+   over the shipped model; a skip fails), `bench coverage` and `bench local`.
+   The record names the commit, the `selector.lock` digest, the catalog revision,
+   the evaluation inputs' digest and the runtime; `qualify-record` refuses it
+   unless it passed and matches the runtime image read by its own interpreter,
+   then stamps it into release state. Training-corpus tests are not part of it.
+   `push` records the pushed image's digest, and the deploy names the image by
+   that digest, never by the mutable `:<commit>` tag.
+4. **`deploy-rc`** refuses without this build's qualification (the first deploy
+   of a service included, and a first deploy serving another catalog is not
+   marked deployed), then validates `_ENVIRONMENT` (`development|test|staging|production`)
    and `_INGRESS` (`all|internal|internal-and-cloud-load-balancing`), writes the
    revision's whole environment — `ENVIRONMENT` and `LOG_LEVEL`, nothing else —
    and deploys with `--clear-secrets`. It then reads the revision back and fails
@@ -68,8 +84,10 @@ Public smoke testing needs only `bash`, `curl` and Python, with an explicit URL:
    any secret at all.
 5. **`smoke`** runs `smoke.sh --url <candidate> --expect-build-sha <commit>`
    against the candidate's own tag URL.
-6. **`promote`** moves 100% of traffic to the revision the smoke proved — by name,
-   never `--to-latest` — and removes this build's tag in the same call.
+6. **`promote`** refuses without this build's qualification, or when the
+   candidate's `/readyz` reports another catalog revision, then moves 100% of
+   traffic to the revision the smoke proved — by name, never `--to-latest` — and
+   removes this build's tag in the same call.
 7. **`release-gate`** always runs: it retires this build's `rc-<build>` tag if it
    is still attached, then fails the build if any earlier step did not record
    success.

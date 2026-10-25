@@ -6,8 +6,8 @@
 #
 #   watch-live.sh <commit-sha> <pushed-at-epoch> [url]
 #
-# The deadline is absolute: the push time plus 35 minutes, the most a
-# deploy-main build can take to start (5 min) and run (its 1800s timeout). Past
+# The deadline is absolute: the push time plus 65 minutes, the most a
+# deploy-main build can take to start (5 min) and run (its 3600s timeout). Past
 # it, no build for that push can still promote. A Monitor expiry before then is
 # not a verdict: re-run with the same arguments and it picks up where it left off.
 #
@@ -20,7 +20,7 @@ PUSHED_AT=${2:?push time (epoch seconds) required}
 URL=${3:-https://assistant.daintree.org}
 URL=${URL%/}
 INTERVAL=20
-DEADLINE=$((PUSHED_AT + 2100))
+DEADLINE=$((PUSHED_AT + 3900))
 
 prev=""
 while :; do

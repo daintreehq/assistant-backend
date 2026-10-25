@@ -272,8 +272,10 @@ MCP spec rather than frozen.
 There is no hosted CI: GitHub runs nothing on a push or a PR. The full check runs locally
 before work lands: install from lock, ruff, `mypy --strict src`, pytest with coverage
 (`pytest -q --cov --cov-report=term:skip-covered`, `fail_under = 90`), `bench coverage`,
-`bench local`. It needs the model fetched (`training/fetch_selector.sh`). It is not a release gate either (Cloud Build's
-candidate smoke test guards production). `bench local` is the routing verdict: it attributes every
+`bench local`. It needs the model fetched (`training/fetch_selector.sh`). The release reruns the
+serving part of it: Cloud Build's `qualify` step runs `benchmarks/qualify_release.py` (the
+serving tests in `QUALIFYING_TESTS`, `bench coverage`, `bench local`) inside the built image
+before anything deploys, so a red routing gate on `develop` is a release that will not ship. `bench local` is the routing verdict: it attributes every
 miss to the stage that lost it, and `candidate_miss` (a required runbook that never
 reached the head) is gated at zero — it is the first number to move as the catalog
 grows, and `bench scale` measures when.
@@ -282,9 +284,11 @@ grows, and `bench scale` measures when.
 
 Nothing is built or pushed from a dev machine. **Pushing to `main` is the deploy** — work
 lands on `develop`, and a release fast-forwards `main`. `cloudbuild.yaml`: substitution
-guard → model fetch by lock → build → push → deploy a **no-traffic** revision tagged `rc-<build>`
+guard → model fetch by lock → build → **qualify** (serving tests, `bench coverage`, `bench local` in
+the image's own venv, bound to commit, lock, catalog revision and runtime) → push → deploy a **no-traffic** revision tagged `rc-<build>`
 (env replaced wholesale, `--clear-secrets`, readback verified) → `infra/gcp/smoke.sh`
-against the tag's URL, including a real search → promote to 100% → `release-gate` retires
+against the tag's URL, including a real search → promote to 100% (refused without the
+qualification, or if the candidate serves another catalog revision) → `release-gate` retires
 the tag and renders the verdict. The first-ever deploy of a service goes out at 100% behind
 an identity-token `/readyz` check. Operators must set `PROJECT` explicitly;
 the deployment scripts document the remaining settings.

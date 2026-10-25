@@ -57,11 +57,12 @@ done)
   the image, is baked in as `BUILD_SHA`, and comes back from `/version`.
 - **No AI attribution** in the merge commit message.
 - **Do not wait for GitHub CI and do not run the test suite.** CI is a report, not a
-  release gate. What protects production is Cloud Build itself: it deploys the commit
-  as a no-traffic candidate, runs a real search against it (`smoke.sh`), and promotes
-  it only if that passes; a malformed runbook or artifact fails `/readyz` and never
-  gets traffic. Routing quality is checked where it changes, when a model is trained
-  and installed (`training/retrain.sh` runs `bench local` before installing).
+  release gate. What protects production is Cloud Build itself: it qualifies the
+  commit's catalog and model inside the built image (the serving tests, `bench
+  coverage` and `bench local`; `benchmarks/qualify_release.py`), deploys it as a
+  no-traffic candidate, runs a real search against it (`smoke.sh`), and promotes it
+  only if all of that passes. A red routing gate on `develop` therefore stops the
+  release in the `qualify` step: report it, never loosen a floor to get past it.
 - **Never use a foreground `sleep`** to wait — the harness blocks it. Watch the build
   with the Monitor tool (step 5).
 - **Pick the mode before the push, never after.** `gh` must work. `gcloud` is
@@ -192,7 +193,8 @@ gcloud builds triggers run deploy-main --region="$BUILD_REGION" \
 
 In public mode, skip to "Public mode" below. In gcloud mode, run `watch-build.sh`
 (next to this file) under the **Monitor** tool, with
-`timeout_ms: 1800000` to match the build's own 1800s timeout:
+`timeout_ms: 1800000` (the Monitor cap); the build's own timeout is 3600s, so
+re-arm it once if it expires with the build still running:
 
 ```bash
 .claude/skills/release/watch-build.sh "$RELEASE_SHA" "$BUILD_REGION"
@@ -234,16 +236,17 @@ tail -80 /tmp/release-build.log
 ```
 
 Identify the failing step and report it. `TIMEOUT` means the whole build ran past
-1800s. Steps it never reached show `CANCELLED`, and it may have stranded an
+3600s. Steps it never reached show `CANCELLED`, and it may have stranded an
 `rc-` tag (see CLAUDE.md, "Deploying"). The `smoke` step failing is the
 important case to explain clearly: the candidate revision was deployed with
 **no traffic**, so production is untouched and still serving the previous
-revision. A `deploy-rc` or `build` failure likewise never reached traffic.
+revision. A `qualify`, `qualify-record`, `deploy-rc` or `build` failure likewise
+never reached traffic; `qualify` prints a PASS/FAIL line per check.
 
 #### Public mode
 
 Run `watch-live.sh` (next to this file) under the **Monitor** tool, with
-`timeout_ms: 1800000`:
+`timeout_ms: 1800000`, re-armed once if it expires before its own deadline:
 
 ```bash
 .claude/skills/release/watch-live.sh "$RELEASE_SHA" "$PUSHED_AT"

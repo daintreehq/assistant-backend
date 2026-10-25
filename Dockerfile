@@ -48,3 +48,27 @@ EXPOSE 8080
 # entrypoint binds HOST/PORT and handles graceful shutdown within Cloud Run's
 # termination window.
 CMD ["python", "-m", "daintree_assistant_server"]
+
+
+# ---- Qualify: the release gate, on the builder's venv ----------------------
+# Built only by cloudbuild.yaml's `qualify` step (`--target=qualify`), never into
+# the image that ships. FROM the builder because its /opt/venv is the layer the
+# runtime copies: the checks below import the INSTALLED package (the same
+# catalog and selector files, the same onnxruntime on the same Linux base), and
+# `identity` reads what that venv serves before the test tools are added beside
+# it, so the record's runtime is the runtime image's own.
+FROM builder AS qualify
+
+ARG BUILD_SHA=""
+
+WORKDIR /qualify
+COPY pyproject.toml requirements.lock selector.lock ./
+COPY src ./src
+COPY tests ./tests
+COPY benchmarks ./benchmarks
+RUN python benchmarks/qualify_release.py identity > identity.json
+RUN pip install -c requirements.lock pytest pytest-asyncio pytest-mock httpx jsonschema
+# The commit goes in as an argument, not as the environment: an ARG is exported
+# to RUN, and the tests' Settings would read it as the server's own BUILD_SHA.
+RUN env -u BUILD_SHA python benchmarks/qualify_release.py run --root /qualify \
+      --build-sha "$BUILD_SHA" --identity identity.json --out qualification.json

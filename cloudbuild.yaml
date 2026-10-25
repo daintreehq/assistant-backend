@@ -15,6 +15,12 @@
 # round trip is how a release is confirmed — the smoke step refuses to promote a
 # revision whose /version disagrees with the commit that triggered the build.
 #
+# Before any of that, the candidate is QUALIFIED: the `qualify` steps run the
+# serving checks and the shipped-selector routing gate against the exact catalog
+# and model in the image, on its own runtime, and bind the record to this
+# commit and selector.lock. Nothing deploys without it, and the promotion
+# refuses a revision that does not serve the qualified catalog.
+#
 # Rollout is two-phase on purpose. A new revision is deployed with NO traffic
 # behind a per-build `rc-<id>` tag and smoke-tested on its own URL; only a
 # revision that satisfies infra/gcp/smoke.sh gets promoted to 100%. Readiness
@@ -60,9 +66,10 @@ options:
   logging: CLOUD_LOGGING_ONLY
   machineType: E2_HIGHCPU_8
 
-# The image build is a full `pip install` of the pinned runtime deps, so the
-# 10-minute default is too tight to be safe.
-timeout: 1800s
+# The image build is a full `pip install` of the pinned runtime deps, and the
+# qualification runs the serving tests and `bench local` over every case on top
+# of it, so the 10-minute default is far too tight.
+timeout: 3600s
 
 steps:
   # ---- Refuse a substitution that is not a name ----------------------------
@@ -257,19 +264,162 @@ steps:
     name: gcr.io/cloud-builders/docker
     args:
       - build
+      # Named, because the Dockerfile's last stage is not the only one: the
+      # `qualify` stage below the runtime is built by its own step.
+      - --target=runtime
       - --build-arg=BUILD_SHA=$COMMIT_SHA
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$COMMIT_SHA
       - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:latest
       - .
 
+  # ---- Qualify the candidate's catalog and selector ------------------------
+  #
+  # The smoke below proves the candidate answers ONE search. A routing document
+  # over its token cap, a carve-out naming nothing or a recall drop all still
+  # answer it with a 200, so the smoke cannot be what decides that the catalog
+  # and the model may serve. This is.
+  #
+  # The Dockerfile's `qualify` stage is the builder's venv, the very layer the
+  # runtime image copies, on the same Linux base, plus the test tools: it reads
+  # what that venv would serve (benchmarks/qualify_release.py identity),
+  # checks the installed selector against selector.lock, runs the serving checks
+  # and `bench coverage` and `bench local`, and writes the record. A failing
+  # check fails the stage's build, and with it this step. A skipped test is a
+  # failure there: a model-dependent check that skipped has proved nothing.
+  #
+  # The record is then compared against the RUNTIME image itself, read by its
+  # own interpreter, so the qualified catalog, model files and installed
+  # distributions are the candidate's rather than a neighbour's. That runs from
+  # the build's own checkout and model fetch: no credential is added for it.
+  #
+  # No `allowFailure`, on this step or the next: an unqualified candidate stops
+  # the build before it is pushed or deployed, so there is no tag to retire.
+  - id: qualify
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    env:
+      - 'BUILDKIT_PROGRESS=plain'
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        rm -f /workspace/qualify_record.json /workspace/candidate_identity.json
+        docker build --target=qualify --build-arg=BUILD_SHA=$COMMIT_SHA \
+          --tag=qualify-$COMMIT_SHA .
+        docker run --rm --entrypoint cat qualify-$COMMIT_SHA /qualify/qualification.json \
+          > /workspace/qualify_record.json
+        docker run -i --rm --entrypoint python \
+          ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$COMMIT_SHA \
+          - identity < benchmarks/qualify_release.py > /workspace/candidate_identity.json
+
+  # Binds the record to this release and stamps it into release state, where
+  # `deploy-rc`, `promote` and `release-gate` each refuse to go on without it.
+  # Refused: a failed verdict, a missing or failed check, another commit, a
+  # selector.lock other than the one `fetch-selector` verified, or a catalog,
+  # model or runtime that differs from the candidate image's.
+  - id: qualify-record
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    volumes:
+      # Release state is not kept in the checkout. See `release-state-init`.
+      - name: release-state
+        path: /release
+    env:
+      - 'BUILD_ID=$BUILD_ID'
+      - 'RELEASE_SHA=$COMMIT_SHA'
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        stamp() {
+          STAMP_NAME="$$1"; shift
+          {
+            printf '%s\n' "$$BUILD_ID"
+            [ "$$#" -eq 0 ] || printf '%s\n' "$$@"
+          } > "/release/$$STAMP_NAME"
+        }
+        stamped() {
+          STAMP=""
+          [ -s "/release/$$1" ] || return 1
+          IFS= read -r STAMP < "/release/$$1" || :
+          [ "$$STAMP" = "$$BUILD_ID" ] || return 1
+          tail -n +2 "/release/$$1"
+        }
+        if [ -z "$${BUILD_ID:-}" ]; then
+          echo "ERROR: BUILD_ID is empty; release state cannot be bound to this build." >&2
+          exit 1
+        fi
+        python3 benchmarks/qualify_release.py verify \
+          --record /workspace/qualify_record.json \
+          --candidate /workspace/candidate_identity.json \
+          --lock selector.lock --build-sha "$$RELEASE_SHA" > /workspace/qualified_lines
+        # Catalog revision, selector.lock sha256, record sha256: one per line.
+        QUALIFIED_REVISION=""; QUALIFIED_LOCK=""; QUALIFIED_RECORD=""
+        {
+          IFS= read -r QUALIFIED_REVISION || :
+          IFS= read -r QUALIFIED_LOCK || :
+          IFS= read -r QUALIFIED_RECORD || :
+        } < /workspace/qualified_lines
+        if [ -z "$$QUALIFIED_REVISION" ] || [ -z "$$QUALIFIED_LOCK" ] \
+           || [ -z "$$QUALIFIED_RECORD" ]; then
+          echo "ERROR: the qualification verdict was incomplete; refusing it." >&2
+          exit 1
+        fi
+        stamp qualification "$$QUALIFIED_REVISION" "$$QUALIFIED_LOCK" "$$QUALIFIED_RECORD"
+        echo "Qualified $$RELEASE_SHA: catalog $$QUALIFIED_REVISION, selector.lock $$QUALIFIED_LOCK."
+
   # Pushed explicitly rather than via the top-level `images:` key, which only
   # runs after every step and would leave the deploy below with no image.
+  #
+  # The deploy names the image by the DIGEST this push produced, never by the
+  # `:$COMMIT_SHA` tag. A tag is mutable: a second build of the same commit can
+  # push over it between this step and the deploy, on a different base image,
+  # and Cloud Run resolves a tag at deploy time. The digest is the image that
+  # was qualified above, because it is this daemon's own local image.
   - id: push
     name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    volumes:
+      # Release state is not kept in the checkout. See `release-state-init`.
+      - name: release-state
+        path: /release
+    env:
+      - 'BUILD_ID=$BUILD_ID'
     args:
-      - push
-      - --all-tags
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}
+      - -euo
+      - pipefail
+      - -c
+      - |
+        stamp() {
+          STAMP_NAME="$$1"; shift
+          {
+            printf '%s\n' "$$BUILD_ID"
+            [ "$$#" -eq 0 ] || printf '%s\n' "$$@"
+          } > "/release/$$STAMP_NAME"
+        }
+        stamped() {
+          STAMP=""
+          [ -s "/release/$$1" ] || return 1
+          IFS= read -r STAMP < "/release/$$1" || :
+          [ "$$STAMP" = "$$BUILD_ID" ] || return 1
+          tail -n +2 "/release/$$1"
+        }
+        if [ -z "$${BUILD_ID:-}" ]; then
+          echo "ERROR: BUILD_ID is empty; release state cannot be bound to this build." >&2
+          exit 1
+        fi
+        REPO="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}"
+        docker push --all-tags "$$REPO"
+        DIGEST="$$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' \
+          "$$REPO:$COMMIT_SHA" | grep -m1 "^$$REPO@sha256:" || true)"
+        if [ -z "$$DIGEST" ]; then
+          echo "ERROR: the pushed image has no digest in $$REPO; refusing to deploy a tag." >&2
+          exit 1
+        fi
+        stamp image_digest "$$DIGEST"
+        echo "Pushed $$DIGEST."
 
   # ---- Deploy the release candidate ---------------------------------------
   #
@@ -319,7 +469,21 @@ steps:
           echo "ERROR: BUILD_ID is empty; release state cannot be bound to this build." >&2
           exit 1
         fi
-        IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$COMMIT_SHA"
+        # Nothing is deployed, not even with no traffic, without this build's
+        # qualification: the first deploy of a service takes all traffic at once.
+        QUALIFIED_REVISION=""
+        if ! QUALIFIED_REVISION="$$(stamped qualification | head -1)" \
+             || [ -z "$$QUALIFIED_REVISION" ]; then
+          echo "ERROR: this build recorded no passing qualification; refusing to deploy." >&2
+          exit 1
+        fi
+        # The qualified image, by the digest `push` recorded. See `push`.
+        IMAGE=""
+        if ! IMAGE="$$(stamped image_digest)" \
+             || [ "$${IMAGE%@sha256:*}" != "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}" ]; then
+          echo "ERROR: this build recorded no pushed image digest; refusing to deploy a tag." >&2
+          exit 1
+        fi
 
         case "$$ENVIRONMENT" in
           development|test|staging|production) ;;
@@ -483,7 +647,14 @@ steps:
             cat /workspace/first_ready >&2 || true
             exit 1
           fi
-          echo "First revision is ready."
+          FIRST_REVISION="$$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("catalog_revision",""))' \
+            /workspace/first_ready 2>/dev/null || true)"
+          if [ "$$FIRST_REVISION" != "$$QUALIFIED_REVISION" ]; then
+            echo "ERROR: the new service serves catalog '$${FIRST_REVISION:-<none>}'," >&2
+            echo "       not the qualified $$QUALIFIED_REVISION." >&2
+            exit 1
+          fi
+          echo "First revision is ready and serves the qualified catalog."
           stamp skip_smoke
         fi
         stamp stage_deploy_ok
@@ -618,6 +789,12 @@ steps:
           echo "ERROR: the candidate was not smoked; refusing to move traffic to it." >&2
           exit 1
         fi
+        QUALIFIED_REVISION=""
+        if ! QUALIFIED_REVISION="$$(stamped qualification | head -1)" \
+             || [ -z "$$QUALIFIED_REVISION" ]; then
+          echo "ERROR: this build recorded no passing qualification; refusing to promote." >&2
+          exit 1
+        fi
         if stamped skip_smoke >/dev/null; then
           echo "First deploy already carries all traffic."
           stamp stage_promote_ok
@@ -645,6 +822,22 @@ steps:
         RC_TAG=""
         if ! RC_TAG="$$(stamped rc_tag)" || [ -z "$$RC_TAG" ]; then
           echo "ERROR: this build recorded no candidate tag; refusing to guess." >&2
+          exit 1
+        fi
+        # The revision about to take traffic must serve the catalog that was
+        # qualified, asked of the revision itself rather than assumed from the
+        # image name.
+        URL=""
+        if ! URL="$$(stamped rc_url)" || [ -z "$$URL" ]; then
+          echo "ERROR: this build recorded no candidate URL; refusing to guess." >&2
+          exit 1
+        fi
+        LIVE_REVISION="$$(curl -fsS --max-time 20 "$$URL/readyz" \
+          | python3 -c 'import json,sys;print(json.load(sys.stdin).get("catalog_revision",""))' \
+          2>/dev/null || true)"
+        if [ "$$LIVE_REVISION" != "$$QUALIFIED_REVISION" ]; then
+          echo "ERROR: the candidate serves catalog '$${LIVE_REVISION:-<unreadable>}'," >&2
+          echo "       not the qualified $$QUALIFIED_REVISION; refusing to promote it." >&2
           exit 1
         fi
         gcloud run services update-traffic "${_SERVICE}" \
@@ -675,7 +868,7 @@ steps:
   # changed is that the tag is gone before it goes red.
   #
   # The residual is worth writing down rather than discovering: a build that is
-  # CANCELLED, or that hits the 1800s top-level timeout, kills this step too, and
+  # CANCELLED, or that hits the 3600s top-level timeout, kills this step too, and
   # the tag survives. Nothing inside a build can cover that. It is bounded by the
   # timeout and visible in the console, where a stranded tag was previously
   # invisible in every case.
@@ -827,14 +1020,17 @@ steps:
           echo "No candidate tag was recorded; nothing to retire."
         fi
 
-        # The verdict. The three markers are the only record of what happened,
+        # The verdict. The markers are the only record of what happened,
         # because the steps that wrote them were allowed to fail without stopping
-        # the build.
+        # the build. `qualification` cannot be missing on a build that got this
+        # far (its step has no allowFailure), and is asked anyway: a verdict that
+        # assumed it would be the one check here nobody could see.
         # Each one is asked whether THIS build wrote it. File existence was the
         # whole of the test until now, and /workspace is the repository checkout —
         # so a tree carrying three empty files reported a green release having run
         # none of it.
         FAILED=""
+        stamped qualification    >/dev/null || FAILED="$$FAILED qualify"
         stamped stage_deploy_ok  >/dev/null || FAILED="$$FAILED deploy-rc"
         stamped stage_smoke_ok   >/dev/null || FAILED="$$FAILED smoke"
         stamped stage_promote_ok >/dev/null || FAILED="$$FAILED promote"

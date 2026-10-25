@@ -8,7 +8,6 @@ __pycache__/
 .ruff_cache/
 htmlcov/
 .coverage
-tests/
 infra/
 *.egg-info/
 .env
@@ -26,9 +25,11 @@ application_default_credentials.json
 *.log
 .DS_Store
 
-# The Dockerfile only copies pyproject.toml, README.md, requirements.lock and
+# The runtime stage only copies pyproject.toml, README.md, requirements.lock and
 # src/, so everything below is context the daemon transfers and never reads.
-benchmarks/
+# tests/ and benchmarks/ are read by the `qualify` stage (the release gate), but
+# a benchmark's saved results are not an input to it.
+benchmarks/*/results/
 archive/
 training/
 docs/

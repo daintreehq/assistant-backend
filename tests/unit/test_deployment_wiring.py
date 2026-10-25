@@ -15,6 +15,7 @@ values before bash parses a step, so `_render` applies the same substitution.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -24,6 +25,8 @@ from typing import Any
 
 import pytest
 import yaml
+
+from benchmarks import qualify_release as Q
 
 _ROOT = Path(__file__).resolve().parents[2]
 _CLOUDBUILD = _ROOT / "cloudbuild.yaml"
@@ -335,7 +338,7 @@ def test_the_guard_never_echoes_the_value_it_refused() -> None:
 # could carry, stamp and all.
 
 #: Every step that touches release state.
-_RELEASE_STATE_STEPS = ("deploy-rc", "smoke", "promote", "release-gate")
+_RELEASE_STATE_STEPS = ("qualify-record", "push", "deploy-rc", "smoke", "promote", "release-gate")
 
 
 def _helper_block(step_id: str) -> str:
@@ -362,6 +365,8 @@ def test_the_release_state_lives_outside_the_repository_checkout(
             "reads or writes is in the repository checkout"
         )
     for name in (
+        "qualification",
+        "image_digest",
         "stage_deploy_ok",
         "stage_smoke_ok",
         "stage_promote_ok",
@@ -1018,10 +1023,26 @@ case "$*" in
 esac
 """
 
-#: The first-deploy readiness check curls the new service; this answers 200.
+#: The first-deploy readiness check curls the new service; this answers 200
+#: with a ready body serving $READY_REVISION (the qualified catalog by default).
 _READY_CURL = """#!/bin/bash
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in -o) out="$2"; shift 2 ;; *) shift ;; esac
+done
+[ -z "$out" ] || printf '{"status": "ready", "catalog_revision": "%s"}' \
+  "${READY_REVISION:-sha256:qualified}" > "$out"
 echo 200
 """
+
+#: What `qualify-record` stamps for a passing qualification: the catalog
+#: revision, the selector.lock digest and the record digest.
+_QUALIFIED = ("sha256:qualified", "a" * 64, "b" * 64)
+
+#: What `push` stamps: the pushed image by digest, in this build's repository.
+_IMAGE_DIGEST = (
+    "us-central1-docker.pkg.dev/example-project/daintree/daintree-assistant@sha256:" + "c" * 64
+)
 
 _DEPLOY_BUILD_ID = "11111111-2222-3333-4444-555555555555"
 
@@ -1032,11 +1053,19 @@ def _run_deploy_rc(
     service_exists: bool = True,
     revision_env: list[dict[str, Any]] | None = None,
     environment: str = "production",
+    qualification: tuple[str, ...] | None = _QUALIFIED,
+    qualification_build_id: str = _DEPLOY_BUILD_ID,
+    ready_revision: str = "sha256:qualified",
+    image_digest: str | None = _IMAGE_DIGEST,
 ) -> tuple[subprocess.CompletedProcess[str], Path, Path, list[str]]:
     workspace = tmp_path / "workspace"
     workspace.mkdir(parents=True)
     release = tmp_path / "release"
     release.mkdir(parents=True)
+    if qualification is not None:
+        _write_stamped(release, "qualification", qualification_build_id, *qualification)
+    if image_digest is not None:
+        _write_stamped(release, "image_digest", _DEPLOY_BUILD_ID, image_digest)
     state = tmp_path / "gcloud-state"
     state.mkdir()
     revision_json = tmp_path / "revision.json"
@@ -1064,6 +1093,7 @@ def _run_deploy_rc(
             "STATE_DIR": str(state),
             "REVISION_JSON": str(revision_json),
             "DEPLOY_LOG": str(deploy_log),
+            "READY_REVISION": ready_revision,
         },
     )
     args = deploy_log.read_text(encoding="utf-8").splitlines() if deploy_log.exists() else []
@@ -1348,7 +1378,12 @@ def _run_cleanup(
     *,
     rc_tag: str | None,
     attached_tags: list[str],
-    markers: tuple[str, ...] = ("stage_deploy_ok", "stage_smoke_ok", "stage_promote_ok"),
+    markers: tuple[str, ...] = (
+        "qualification",
+        "stage_deploy_ok",
+        "stage_smoke_ok",
+        "stage_promote_ok",
+    ),
     describe_ok: str = "yes",
     state_build_id: str = _CLEANUP_BUILD_ID,
     seed_checkout: tuple[str, ...] = (),
@@ -1500,3 +1535,393 @@ def test_a_candidate_tag_this_build_did_not_write_is_not_removed(tmp_path: Path)
     assert removed == [], f"the cleanup acted on a tag it did not write: {removed}"
     assert result.returncode != 0
     assert "this build did not write it" in result.stderr
+
+
+# --- qualification: the catalog and selector, before any deploy -------------------
+#
+# The smoke proves a candidate answers one search; it cannot prove the catalog
+# routes. `qualify` runs the serving checks and `bench local` against the exact
+# image contents, and `qualify-record` binds the result to this release. These
+# prove the build REFUSES without it, on every path that could move traffic.
+
+
+def test_qualification_runs_before_the_candidate_is_pushed_or_deployed(
+    cloudbuild: dict[str, Any],
+) -> None:
+    ids = [s["id"] for s in cloudbuild["steps"]]
+    assert ids.index("fetch-selector") < ids.index("build") < ids.index("qualify")
+    assert ids.index("qualify") < ids.index("qualify-record") < ids.index("push")
+    assert ids.index("push") < ids.index("deploy-rc")
+    steps = {s["id"]: s for s in cloudbuild["steps"]}
+    for step_id in ("qualify", "qualify-record"):
+        assert steps[step_id].get("allowFailure") is not True, (
+            f"{step_id} may fail without stopping the build, so an unqualified "
+            "candidate would be pushed and deployed"
+        )
+
+
+def test_the_qualify_step_tests_the_image_that_ships(cloudbuild: dict[str, Any]) -> None:
+    """The qualify stage is FROM the builder whose venv the runtime copies, and
+    the record is compared against the runtime image's own interpreter."""
+    build_args = _step("build")["args"]
+    assert "--target=runtime" in build_args
+    script = _step("qualify")["args"][-1]
+    assert "docker build --target=qualify --build-arg=BUILD_SHA=$COMMIT_SHA" in script
+    image = "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$COMMIT_SHA"
+    assert image in script and "- identity < benchmarks/qualify_release.py" in script
+    dockerfile = (_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "FROM builder AS qualify" in dockerfile
+    assert "COPY --from=builder /opt/venv /opt/venv" in dockerfile
+    stage = dockerfile[dockerfile.index("FROM builder AS qualify") :]
+    # identity is read before the test tools are installed beside the runtime.
+    assert stage.index("identity > identity.json") < stage.index("pip install")
+    assert "qualify_release.py run" in stage
+    ignored = (_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+    for needed in ("tests/", "benchmarks/", "selector.lock"):
+        assert needed not in ignored, f".dockerignore keeps {needed} from the qualify stage"
+
+
+def _qualification_files(workspace: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    """A passing record and the matching candidate identity, with a lock."""
+    lock = {"bucket": "gs://x", "files": {"head.onnx": {"sha256": "1" * 64, "size": 1}}}
+    (workspace / "selector.lock").write_text(json.dumps(lock), encoding="utf-8")
+    lock_sha = hashlib.sha256((workspace / "selector.lock").read_bytes()).hexdigest()
+    candidate = {
+        "catalog_revision": "sha256:qualified",
+        "runbooks": 3,
+        "selector": {"head.onnx": "1" * 64, "meta.json": "2" * 64},
+        "runtime": {"python": "3.12.0", "distributions": {"onnxruntime": "1.28.0"}},
+    }
+    record = {
+        **candidate,
+        "schema": 1,
+        "build_sha": _BUILTINS["COMMIT_SHA"],
+        "selector_lock_sha256": lock_sha,
+        "evaluation": {
+            "inputs_sha256": Q._tree_digest(workspace, Q._EVALUATION_INPUTS),
+            "tests": list(Q.QUALIFYING_TESTS),
+            "checks": [
+                {"name": n, "status": "pass"}
+                for n in ("runtime-unchanged", "selector-lock", "pytest", "bench-coverage",
+                          "bench-local")
+            ],
+        },
+        "verdict": "pass",
+    }
+    return record, candidate
+
+
+def _run_qualify_record(
+    tmp_path: Path, *, record: dict[str, Any] | None, candidate: dict[str, Any] | None = None
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    workspace = tmp_path / "workspace"
+    (workspace / "benchmarks").mkdir(parents=True)
+    release = tmp_path / "release"
+    release.mkdir(parents=True)
+    passing, matching = _qualification_files(workspace)
+    (workspace / "benchmarks" / "qualify_release.py").write_bytes(
+        (_ROOT / "benchmarks" / "qualify_release.py").read_bytes()
+    )
+    if record is not None:
+        (workspace / "qualify_record.json").write_text(
+            json.dumps(record), encoding="utf-8"
+        )
+    (workspace / "candidate_identity.json").write_text(
+        json.dumps(candidate if candidate is not None else matching), encoding="utf-8"
+    )
+    body: str = _step("qualify-record")["args"][-1]
+    result = subprocess.run(  # noqa: S603 - a script this repo owns, on fixed input
+        ["bash", "-c", "set -euo pipefail\n" + _render(body, release=release, workspace=workspace)],
+        cwd=workspace,
+        env={"PATH": os.environ["PATH"], "BUILD_ID": "build-q", "RELEASE_SHA": _BUILTINS["COMMIT_SHA"]},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    return result, release
+
+
+def test_a_passing_qualification_is_stamped_for_the_release(tmp_path: Path) -> None:
+    """The positive control for every refusal below."""
+    record, _ = _qualification_files(tmp_path)
+    result, release = _run_qualify_record(tmp_path, record=record)
+    assert result.returncode == 0, result.stderr
+    lines = _read_stamped(release, "qualification", "build-q").splitlines()
+    assert lines[0] == "sha256:qualified"
+    assert lines[1] == record["selector_lock_sha256"]
+    written = (tmp_path / "workspace" / "qualify_record.json").read_bytes()
+    assert lines[2] == hashlib.sha256(written).hexdigest()
+    assert len(lines) == 3
+
+
+def _passing_checks() -> list[dict[str, str]]:
+    return [{"name": n, "status": "pass"} for n in Q.REQUIRED_CHECKS]
+
+
+@pytest.mark.parametrize(
+    ("evaluation", "reason"),
+    [
+        ({"checks": []}, "bench-local is missing"),
+        # A later duplicate must not paper over a failure, nor an extra row pass.
+        (
+            {"checks": [*_passing_checks()[:-1], {"name": "bench-local", "status": "fail"},
+                        {"name": "bench-local", "status": "pass"}]},
+            "bench-local is",
+        ),
+        (
+            {"checks": [*_passing_checks(), {"name": "extra", "status": "fail"}]},
+            "not exactly the required ones",
+        ),
+        ({"tests": ["tests/unit/test_catalog.py"]}, "other tests than QUALIFYING_TESTS"),
+        ({"inputs_sha256": "3" * 64}, "evaluation inputs are not this checkout's"),
+    ],
+)
+def test_a_record_that_did_not_run_the_qualification_stops_the_build(
+    tmp_path: Path, evaluation: dict[str, Any], reason: str
+) -> None:
+    record, _ = _qualification_files(tmp_path)
+    record["evaluation"].update(evaluation)
+    result, release = _run_qualify_record(tmp_path, record=record)
+    assert result.returncode != 0
+    assert reason in result.stderr
+    assert not (release / "qualification").exists()
+
+
+def test_a_selector_the_lock_does_not_name_stops_the_build_even_when_it_matches(
+    tmp_path: Path,
+) -> None:
+    """Record and candidate agree with each other, and both lack a locked file:
+    only the lock guard can refuse this one."""
+    record, candidate = _qualification_files(tmp_path)
+    for doc in (record, candidate):
+        doc["selector"] = {"meta.json": "2" * 64}
+    result, release = _run_qualify_record(tmp_path, record=record, candidate=candidate)
+    assert result.returncode != 0
+    assert "not the ones selector.lock names" in result.stderr
+    assert "differs from the qualified one" not in result.stderr
+    assert not (release / "qualification").exists()
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        ({"verdict": "fail"}, "verdict"),
+        ({"build_sha": "f" * 40}, "qualified build"),
+        ({"selector_lock_sha256": "0" * 64}, "selector.lock"),
+        ({"selector": {"head.onnx": "9" * 64}}, "selector"),
+        ({"catalog_revision": "sha256:other"}, "catalog_revision"),
+        ({"runtime": {"python": "3.11.0"}}, "runtime"),
+        ({"runtime": None}, "no usable runtime"),
+        ({"evaluation": None}, "no evaluation"),
+    ],
+)
+def test_a_failed_or_mismatched_qualification_stops_the_build(
+    tmp_path: Path, change: dict[str, Any], reason: str
+) -> None:
+    record, _ = _qualification_files(tmp_path)
+    record.update(change)
+    result, release = _run_qualify_record(tmp_path, record=record)
+    assert result.returncode != 0
+    assert reason in result.stderr
+    assert not (release / "qualification").exists()
+
+
+def test_a_skipped_check_does_not_qualify(tmp_path: Path) -> None:
+    record, _ = _qualification_files(tmp_path)
+    record["evaluation"]["checks"][-1]["status"] = "skipped"
+    result, release = _run_qualify_record(tmp_path, record=record)
+    assert result.returncode != 0
+    assert "bench-local is skipped" in result.stderr
+    assert not (release / "qualification").exists()
+
+
+def test_a_missing_qualification_record_stops_the_build(tmp_path: Path) -> None:
+    result, release = _run_qualify_record(tmp_path, record=None)
+    assert result.returncode != 0
+    assert "no usable qualification" in result.stderr
+    assert not (release / "qualification").exists()
+
+
+def test_an_unqualified_build_deploys_nothing(tmp_path: Path) -> None:
+    """Not even a no-traffic candidate, and not the first deploy either."""
+    for exists in (True, False):
+        case = tmp_path / str(exists)
+        result, release, _, args = _run_deploy_rc(case, service_exists=exists, qualification=None)
+        assert result.returncode != 0
+        assert "no passing qualification" in result.stderr
+        assert args == [], "a deploy ran without a qualification"
+        assert not (release / "stage_deploy_ok").exists()
+
+
+def test_a_qualification_another_build_wrote_deploys_nothing(tmp_path: Path) -> None:
+    result, release, _, args = _run_deploy_rc(
+        tmp_path, qualification_build_id="some-other-build"
+    )
+    assert result.returncode != 0
+    assert args == []
+    assert not (release / "stage_deploy_ok").exists()
+
+
+def test_a_first_deploy_serving_another_catalog_is_not_marked_deployed(tmp_path: Path) -> None:
+    result, release, _, _ = _run_deploy_rc(
+        tmp_path, service_exists=False, ready_revision="sha256:other"
+    )
+    assert result.returncode != 0
+    assert "not the qualified sha256:qualified" in result.stderr
+    assert not (release / "stage_deploy_ok").exists()
+    assert not (release / "skip_smoke").exists()
+
+
+#: The promotion's view: a candidate whose /readyz serves $LIVE_REVISION, and a
+#: gcloud that records any traffic it is asked to move.
+_PROMOTE_CURL = """#!/bin/bash
+[ "${LIVE_OK:-yes}" = "yes" ] || exit 22
+printf '{"status": "ready", "catalog_revision": "%s"}' "$LIVE_REVISION"
+"""
+_PROMOTE_GCLOUD = """#!/bin/bash
+echo "$*" >> "$TRAFFIC_LOG"
+"""
+_PROMOTE_BUILD_ID = "build-promote"
+
+
+def _run_promote(
+    tmp_path: Path,
+    *,
+    qualification: tuple[str, ...] | None = _QUALIFIED,
+    live_revision: str = "sha256:qualified",
+    live_ok: str = "yes",
+    first_deploy: bool = False,
+) -> tuple[subprocess.CompletedProcess[str], Path, list[str]]:
+    release = tmp_path / "release"
+    release.mkdir(parents=True)
+    _write_stamped(release, "stage_smoke_ok", _PROMOTE_BUILD_ID)
+    if first_deploy:
+        _write_stamped(release, "skip_smoke", _PROMOTE_BUILD_ID)
+    else:
+        _write_stamped(release, "rc_revision", _PROMOTE_BUILD_ID, "svc-00002-new")
+        _write_stamped(release, "rc_tag", _PROMOTE_BUILD_ID, "rc-build")
+        _write_stamped(release, "rc_url", _PROMOTE_BUILD_ID, "https://rc-build---svc.run.app")
+    if qualification is not None:
+        _write_stamped(release, "qualification", _PROMOTE_BUILD_ID, *qualification)
+    log = tmp_path / "traffic"
+    log.write_text("", encoding="utf-8")
+    body: str = _step("promote")["args"][-1]
+    result = _bash(
+        "set -euo pipefail\n" + _render(body, release=release, workspace=tmp_path),
+        {
+            "PATH": _fake_bin(tmp_path, gcloud=_PROMOTE_GCLOUD, curl=_PROMOTE_CURL),
+            "BUILD_ID": _PROMOTE_BUILD_ID,
+            "LIVE_REVISION": live_revision,
+            "LIVE_OK": live_ok,
+            "TRAFFIC_LOG": str(log),
+        },
+    )
+    return result, release, [line for line in log.read_text(encoding="utf-8").splitlines() if line]
+
+
+def test_a_qualified_first_deploy_is_recorded_as_promoted(tmp_path: Path) -> None:
+    """The first deploy already carries all traffic: nothing to move or curl."""
+    result, release, traffic = _run_promote(tmp_path, first_deploy=True, live_ok="no")
+    assert result.returncode == 0, result.stderr
+    assert traffic == []
+    assert _read_stamped(release, "stage_promote_ok", _PROMOTE_BUILD_ID) == ""
+
+
+def test_the_deploy_names_the_pushed_digest_never_the_tag(tmp_path: Path) -> None:
+    result, _, _, args = _run_deploy_rc(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert f"--image={_IMAGE_DIGEST}" in args
+
+
+@pytest.mark.parametrize(
+    "digest",
+    [None, "us-central1-docker.pkg.dev/elsewhere/daintree/daintree-assistant@sha256:" + "c" * 64],
+)
+def test_without_this_builds_digest_nothing_deploys(tmp_path: Path, digest: str | None) -> None:
+    result, release, _, args = _run_deploy_rc(tmp_path, image_digest=digest)
+    assert result.returncode != 0
+    assert "no pushed image digest" in result.stderr
+    assert args == []
+    assert not (release / "stage_deploy_ok").exists()
+
+
+_PUSH_DOCKER = """#!/bin/bash
+case "$1" in
+  push) echo "$*" >> "$PUSH_LOG" ;;
+  inspect) [ -z "${DIGESTS:-}" ] || printf '%s\n' $DIGESTS ;;
+esac
+"""
+
+
+@pytest.mark.parametrize(
+    ("digests", "recorded"),
+    [
+        (
+            "other.example/x@sha256:" + "d" * 64 + " " + _IMAGE_DIGEST,
+            _IMAGE_DIGEST,
+        ),
+        ("", None),
+    ],
+)
+def test_the_push_records_its_own_digest_or_stops(
+    tmp_path: Path, digests: str, recorded: str | None
+) -> None:
+    release = tmp_path / "release"
+    release.mkdir()
+    log = tmp_path / "push-log"
+    body: str = _step("push")["args"][-1]
+    result = _bash(
+        "set -euo pipefail\n" + _render(body, release=release, workspace=tmp_path),
+        {
+            "PATH": _fake_bin(tmp_path, docker=_PUSH_DOCKER),
+            "BUILD_ID": "build-push",
+            "DIGESTS": digests,
+            "PUSH_LOG": str(log),
+        },
+    )
+    assert "--all-tags" in log.read_text(encoding="utf-8")
+    if recorded is None:
+        assert result.returncode != 0
+        assert not (release / "image_digest").exists()
+    else:
+        assert result.returncode == 0, result.stderr
+        assert _read_stamped(release, "image_digest", "build-push") == recorded
+
+
+def test_a_qualified_candidate_serving_the_qualified_catalog_is_promoted(
+    tmp_path: Path,
+) -> None:
+    result, release, traffic = _run_promote(tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert len(traffic) == 1 and "--to-revisions=svc-00002-new=100" in traffic[0]
+    assert _read_stamped(release, "stage_promote_ok", _PROMOTE_BUILD_ID) == ""
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "reason"),
+    [
+        ({"qualification": None}, "no passing qualification"),
+        ({"qualification": None, "first_deploy": True}, "no passing qualification"),
+        ({"live_revision": "sha256:other"}, "not the qualified sha256:qualified"),
+        ({"live_ok": "no"}, "<unreadable>"),
+    ],
+)
+def test_the_promotion_refuses_an_unqualified_or_mismatched_candidate(
+    tmp_path: Path, kwargs: dict[str, Any], reason: str
+) -> None:
+    result, release, traffic = _run_promote(tmp_path, **kwargs)
+    assert result.returncode != 0
+    assert reason in result.stderr
+    assert traffic == [], "traffic moved onto an unqualified candidate"
+    assert not (release / "stage_promote_ok").exists()
+
+
+def test_the_verdict_names_a_missing_qualification(tmp_path: Path) -> None:
+    result, _ = _run_cleanup(
+        tmp_path,
+        rc_tag=None,
+        attached_tags=[],
+        markers=("stage_deploy_ok", "stage_smoke_ok", "stage_promote_ok"),
+    )
+    assert result.returncode != 0
+    assert "qualify" in result.stderr
