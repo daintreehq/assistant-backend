@@ -7,24 +7,26 @@ captured from the app itself rather than written by hand. All current runbooks
 (`runbooks/catalog/`) are checked against these captures. Retired v0.44 surfaces
 are historical material in `archive/inbox-v0.44/surfaces/`.
 
-**Source:** `daintreehq/daintree` commit `1752ef90a46df6152f95a0befde2dca46491e44c`,
-`develop`, app 0.46.0. Captured 2026-10-24. This includes direct host control,
+**Source:** `daintreehq/daintree` commit `2c6d1fb3d46061ceb8526a88efdb60f04d6f6f57`,
+`develop`, app 0.46.0. Captured 2026-10-25. This includes direct host control,
 assistant messaging through agent terminals, background agent placement,
 `terminal.placeOwned`, `host.ensureProject`, `host.settings`, and
-`project.runCommand` admitted to Daintree's own assistant at Core as at Full.
-The capture also ran 241 app host-control contract tests.
+`project.runCommand` admitted to Daintree's own assistant at Core as at Full,
+the `host.call` throwaway target (app #14444-#14447), and the owned
+`terminal.restartOnPresetOwned`. The capture also ran 254 app host-control
+contract tests.
 
 | file | tools | `mcp.surface` hash |
 |---|---|---|
-| `external.json` | 35 | `e037a9a2…` |
-| `global-core.json` | 0 (3 root tools) | `8ae74d79…` |
-| `global-full.json` | 0 (3 root tools) | `baf5980b…` |
-| `help-core.json` | 45 | `442ecb41…` |
-| `help-full.json` | 93 | `2f9f2157…` |
-| `pane-core.json` | 79 | `9ca140da…` |
-| `pane-full.json` | 79 | `0e6e52f9…` |
-| `relayed-core.json` | 38 | `04077ad3…` |
-| `relayed-full.json` | 80 | `7f5f06b9…` |
+| `external.json` | 36 | `4fc679b0…` |
+| `global-core.json` | 0 (3 root tools) | `9a046ac9…` |
+| `global-full.json` | 0 (3 root tools) | `d75e9c00…` |
+| `help-core.json` | 46 | `909aebe4…` |
+| `help-full.json` | 94 | `2c9a0fd9…` |
+| `pane-core.json` | 80 | `37899dc6…` |
+| `pane-full.json` | 80 | `cd5a2894…` |
+| `relayed-core.json` | 39 | `3ebdfa2c…` |
+| `relayed-full.json` | 81 | `932403df…` |
 
 Full hashes and caller/tier details are in each file's `capture`.
 
@@ -36,7 +38,7 @@ Full hashes and caller/tier details are in each file's `capture`.
 file records two narrower variants in `capture.variants`: a help session this
 machine runs for a remote Shell's window (no `host.*`), and this machine's
 assistant running with no window (#13511), which is what a host's assistant a
-Shell started through `host.call` `assistant.start` works with (34 tools at Core).
+Shell started through `host.call` `assistant.start` works with (35 tools at Core).
 
 `host.call {hostId, projectId, tool, args?, callId?}` runs `tool` with `args`
 through a session the host opens for the calling assistant: the relayed surface.
@@ -49,6 +51,17 @@ twins (`terminal.sendCommandOwned` with `generation`, `handback` and `notify`,
 tool (a call does not chain) or `help.displayImage`. A host with no window on the
 project lists less to a relay (`capture.variants.no_view_attached`), but calls
 name a tool by id and run regardless.
+
+**The throwaway target.** `host.call` names exactly one target: `projectId`, or
+`throwaway: true` for a short-lived agent the calling session owns in one
+host-owned folder, outside every project, view and worktree. The listed schema
+requires only `hostId` and `tool`; the one-target rule is a refinement the app
+checks at the parse boundary (`INVALID_ARGS`), not part of the JSON schema. A
+throwaway target takes six tools that are not actions and appear on no surface:
+`throwaway.launch`, `throwaway.status`, `throwaway.output`,
+`throwaway.sendCommand`, `throwaway.sendKeys`, `throwaway.close`. Their arguments
+are in the app's `shared/types/hostThrowaway.ts`, not in these captures, so a
+runbook example of one is grounded by hand rather than validated here.
 
 ## The global Assistant
 
@@ -63,7 +76,7 @@ admits only `capture.host_call.admits` (`GLOBAL_ALLOWED_TOOLS`) and refuses the 
 it launched there or the person handed it (Hand to orchestrator, Global Assistant);
 it closes only what it launched.
 
-At `1752ef90` its `tools/list` is **empty**: it is listed from the viewless help base
+At `2c6d1fb3` its `tools/list` is **empty**: it is listed from the viewless help base
 manifest, which carries no `host.*` entry, although dispatch admits the three root
 tools (`capture.notes`). The tests read the root tools' schemas from the help surface
 of the same Tool set and record the gap rather than hide it. `capture.native_setup`
@@ -134,7 +147,7 @@ dots kept, no prefix, no escaping (`terminal.sendCommandOwned`). Daintree
 registers itself under the server key `daintree`, so Claude Code shows these as
 `mcp__daintree__<name>`.
 
-**Agent panes list the same 79 tools at core and full.** A pane's tier is where
+**Agent panes list the same 80 tools at core and full.** A pane's tier is where
 auto-approval stops, not a ceiling (#12692). The two pane files are identical on
 the wire; they differ only in `daintree.reach`, `daintree.surface_tier` and the
 surface hash. A pane is never offered `host.call`, `assistant.*`,

@@ -2,7 +2,7 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "1752ef90a46df6152f95a0befde2dca46491e44c",
+    "app_commit": "2c6d1fb3d46061ceb8526a88efdb60f04d6f6f57",
     "app_version": "0.46.0",
     "caller_origin": "api-key",
     "session_origin": "external",
@@ -26,14 +26,15 @@
       "added_remote_hosts": true,
       "manifest_source": "view"
     },
-    "captured_at": "2026-10-24",
+    "captured_at": "2026-10-25",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "e037a9a24b14913f8846201bce82360b25d051363a91310bee230945fa2f4dcf",
+    "surface_hash": "4fc679b0e977f07b89e3221e65a97be9ec2b1959cbd8d4452fb78f54a3b99095",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest and session policy)",
-    "tool_count": 35,
+    "tool_count": 36,
     "withheld_when_workspace_bound": [
       "recipe.run",
+      "terminal.restartOnPresetOwned",
       "worktree.deleteOwned"
     ],
     "omitted_args": {
@@ -422,15 +423,14 @@
                   "panel-limit",
                   "already-launching",
                   "spawn-failed",
-                  "unavailable",
-                  "host-memory"
+                  "unavailable"
                 ]
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Null if launched. panel-limit: see panelLimit; already-launching, host-memory: retry; missing-cli: setup opened."
+            "description": "Null on a launch, else why not: panel-limit (see panelLimit), already-launching (retry), missing-cli (setup panel opened)."
           },
           "worktreeId": {
             "type": [
@@ -2729,6 +2729,69 @@
         "category": "terminal",
         "danger": "safe",
         "band": "reversible",
+        "surface_tier": "external",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "terminal.restartOnPresetOwned",
+      "wire_name": "terminal.restartOnPresetOwned",
+      "description": "Respawn an agent panel this session launched on another preset of its agent, in place, after the user confirms: for an agent that hit a plan limit. Its conversation and scrollback are lost. Panels it was handed are refused.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "terminalId": {
+            "type": "string",
+            "description": "Panel `id` this session got when launching it. Required."
+          },
+          "presetId": {
+            "type": "string",
+            "description": "A preset `id` of the panel's own agent."
+          }
+        },
+        "required": [
+          "terminalId",
+          "presetId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "terminalId": {
+            "type": "string",
+            "description": "The pane, respawned in place."
+          },
+          "agentPresetId": {
+            "type": "string",
+            "description": "Preset it now runs on."
+          },
+          "agentSessionIdCleared": {
+            "type": "boolean",
+            "const": true,
+            "description": "A new conversation started: re-send anything the agent still needs."
+          }
+        },
+        "required": [
+          "terminalId",
+          "agentPresetId",
+          "agentSessionIdCleared"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Move owned agent to another preset",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": true,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "terminal",
+        "danger": "confirm",
+        "band": "destructive-local",
         "surface_tier": "external",
         "reach": "tier"
       }

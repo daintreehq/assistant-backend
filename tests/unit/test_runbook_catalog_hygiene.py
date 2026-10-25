@@ -216,7 +216,12 @@ def test_a_host_call_reaches_the_relayed_surface_of_its_own_tier() -> None:
         assert capture(relayed)["capture"]["tier"] == capture(help_surface)["capture"]["tier"]
     schema = capture("help-core")["tools"]
     call = next(t for t in schema if t["action_id"] == "host.call")
-    assert call["inputSchema"]["required"] == ["hostId", "projectId", "tool"]
+    # A call names one target, a project or a throwaway run; the app enforces the
+    # choice past the schema, so neither is required here.
+    assert call["inputSchema"]["required"] == ["hostId", "tool"]
+    properties = call["inputSchema"]["properties"]
+    assert "projectId" in properties
+    assert properties["throwaway"]["const"] is True
 
 
 def test_a_delta_that_does_not_apply_is_refused() -> None:
