@@ -23,6 +23,15 @@ four different fixes. Every missing runbook is attributed to the stage that lost
 | `floor_reject` | out-scored the cut, refused by a floor | calibration |
 | `cardinality_short` | the count head asked for fewer | the count head |
 | `cap_full` | the answer was already at `max_active_runbooks` | the cap |
+| `background_reuse` | a background wake reused the prior set; the model never ran | the case, or the structural rule |
+
+The stages count missing **runbooks**, not failed trials: one trial can lose two
+required runbooks to two different stages. So the summary carries both units —
+`recall_miss_trials` (trials with any miss, the denominator of the miss rate) and
+`missing_runbooks` (every required runbook not loaded) — and the gate checks that
+the stages sum to `missing_runbooks` and that `unreconciled_losses` is empty: each
+missing (case, runbook) pair attributed to exactly one declared stage.
+`candidate_miss_runbooks` is the `candidate_miss` stage's count, in runbooks.
 
 `candidate_miss` is the one to watch as the catalog grows. At ~40 runbooks it was nearly
 unreachable against `k=32` (84% of the catalog on the ballot regardless); at 87 (2026-09-28)

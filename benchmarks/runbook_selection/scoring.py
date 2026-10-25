@@ -122,7 +122,11 @@ def summarize(cases: list[BenchCase], results: list[TrialResult]) -> dict[str, A
         "trials_total": len(results),
         "trials_passed": sum(r.passed for r in results),
         "degraded_trials": sum(r.degraded for r in results),
+        # Two units, kept apart: a trial that loses two required runbooks is one
+        # failed-recall trial and two missing runbooks. Rates are taken over
+        # trials; the stage histogram reconciles against runbooks.
         "recall_miss_trials": sum(bool(r.missing) for r in results),
+        "missing_runbooks": sum(len(r.missing) for r in results),
         "precision_extra_trials": sum(bool(r.extra) for r in results),
         "docs": {
             "scored_trials": len(docs_scored),

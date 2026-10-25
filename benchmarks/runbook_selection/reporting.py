@@ -51,7 +51,8 @@ def print_summary(doc: dict[str, Any]) -> None:
         f"degraded={s['degraded_trials']}"
     )
     print(
-        f"errors  recall-miss trials={s['recall_miss_trials']}  "
+        f"errors  recall-miss trials={s['recall_miss_trials']} "
+        f"(missing runbooks={s['missing_runbooks']})  "
         f"precision-extra trials={s['precision_extra_trials']}"
     )
     docs = s.get("docs") or {}

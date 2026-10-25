@@ -27,7 +27,7 @@ def _run(
             "recall_pass_cases": sum(1 for c in cases if c not in lost),
             "cases_passed": 0,
             "cases_total": len(cases),
-            "candidate_miss_trials": sum(1 for _, _, s in losses if s == "candidate_miss"),
+            "candidate_miss_runbooks": sum(1 for _, _, s in losses if s == "candidate_miss"),
         },
         "case_ids": list(cases),
         "recall_pass": [c not in lost for c in cases],

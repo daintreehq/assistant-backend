@@ -144,6 +144,33 @@ def _attribute(
     return StageLoss(case.id, missing, stage, probability)
 
 
+def _reconcile(results: list[Any], losses: list[StageLoss]) -> list[str]:
+    """Every missing required runbook, matched to exactly one declared stage.
+
+    Keyed by (case, runbook) rather than compared as totals, because totals can
+    agree by accident: an omitted loss in one case and a duplicated one in
+    another sum to the right number. Returns one line per discrepancy, so an
+    empty list is the only reconciled answer.
+    """
+    expected = Counter((r.case_id, sid) for r in results for sid in r.missing)
+    attributed = Counter((loss.case_id, loss.runbook_id) for loss in losses)
+    problems: list[str] = []
+    for case_id, runbook_id in sorted(expected.keys() | attributed.keys()):
+        want = expected[(case_id, runbook_id)]
+        got = attributed[(case_id, runbook_id)]
+        if got < want:
+            problems.append(f"{case_id}/{runbook_id}: missed but attributed to no stage")
+        elif got > want:
+            what = "attributed more than once" if want else "attributed but not missed"
+            problems.append(f"{case_id}/{runbook_id}: {what}")
+    problems.extend(
+        f"{loss.case_id}/{loss.runbook_id}: undeclared stage {loss.stage!r}"
+        for loss in losses
+        if loss.stage not in STAGES
+    )
+    return problems
+
+
 def run_local(
     *,
     artifact: Path | None = None,
@@ -320,10 +347,13 @@ def build_local_doc(
     }
 
     by_stage = Counter(loss.stage for loss in losses)
+    # Counts missing RUNBOOKS, so it sums to `missing_runbooks`, not to
+    # `recall_miss_trials`: one trial can lose several, each to its own stage.
     summary["stages"] = {name: by_stage.get(name, 0) for name in STAGES}
+    summary["unreconciled_losses"] = _reconcile(results, losses)
     # The number this whole suite exists to make visible as the catalog grows.
     # It must be zero at 38 runbooks and it is the first thing to move at 500.
-    summary["candidate_miss_trials"] = by_stage.get("candidate_miss", 0)
+    summary["candidate_miss_runbooks"] = by_stage.get("candidate_miss", 0)
     summary["reserved_cases"] = reserved_cases
     summary["spans_ms"] = {
         name: {
@@ -392,11 +422,12 @@ def print_local(doc: dict[str, Any]) -> None:
     print(
         f"recall-pass {summary['recall_pass_cases']}/{summary['cases_total']}   "
         f"strict {summary['cases_passed']}/{summary['cases_total']}   "
-        f"miss {summary['recall_miss_trials']}   extra {summary['precision_extra_trials']}   "
+        f"miss {summary['recall_miss_trials']} trials ({summary['missing_runbooks']} runbooks)   "
+        f"extra {summary['precision_extra_trials']}   "
         f"docs {summary['docs']['correct_trials']}/{summary['docs']['scored_trials']}"
     )
     stages = summary["stages"]
-    print("\nwhere required runbooks were lost:")
+    print(f"\nwhere the {summary['missing_runbooks']} missing required runbooks were lost:")
     for name in STAGES:
         print(f"  {name:20} {stages[name]:3d}")
     print(f"  {'reserved cases':20} {summary['reserved_cases']:3d}")
@@ -489,7 +520,8 @@ def print_local_compare(a: dict[str, Any], b: dict[str, Any]) -> None:
     for label, key in (("recall-pass", "recall_pass_cases"), ("strict", "cases_passed")):
         print(f"{label:14} A {sa[key]}/{sa['cases_total']}   B {sb[key]}/{sb['cases_total']}")
     print(
-        f"{'candidate_miss':14} A {sa['candidate_miss_trials']}   B {sb['candidate_miss_trials']}"
+        f"{'candidate_miss':14} A {sa['candidate_miss_runbooks']}   "
+        f"B {sb['candidate_miss_runbooks']}  (runbooks)"
     )
     _print_category_compare(sa, sb)
     common = sorted(set(ca) & set(cb))
