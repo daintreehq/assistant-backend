@@ -258,3 +258,87 @@ cases:
       optional:
       - daintree.hosts.foundation
       - daintree.foundation
+
+  # Throwaway host agents: the usage panes on a host now run outside every project.
+  # These pin the requests that ask for it, and the two neighbours that must keep theirs.
+  - id: hosts-usage-every-machine-throwaway
+    category: single-runbook
+    host_model: control
+    host_state:
+      hosts: connected
+    note: >-
+      User-phrased, the shortest form of the ask. The positive clause claims it: "on this
+      machine or on the Remote Hosts this Shell controls ("usage left on each of my machines")",
+      "reported machine by machine, never added together". daintree.hosts.survey-hosts reports
+      host status, not allowance, and is excluded.
+    messages:
+      - role: user
+        content: check usage on all my machines
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-usage-weekly-allowance-each-host-reset
+    category: single-runbook
+    host_model: control
+    host_state:
+      hosts: connected
+    note: >-
+      User-phrased, in the person's own word for their hosts. "how close they are to a weekly
+      or five-hour cap, when an agent's usage resets", "reported machine by machine".
+    messages:
+      - role: user
+        content: how much weekly allowance is left on each studio, and when does it reset
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-usage-read-each-claude-usage-screen
+    category: host-query
+    host_model: control
+    host_state:
+      hosts: connected
+    note: >-
+      Agent-phrased. "The deliverable is the account figures read off the agent's own usage
+      screen", "on the Remote Hosts this Shell controls", "reported machine by machine".
+      daintree.agents.run-agent-command is fenced off usage figures and is excluded.
+    messages:
+      - role: user
+        content: Read each Remote Host's Claude Code /usage screen and report what's left per machine
+    expect:
+      required: [daintree.agents.check-usage-limits]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-status-busy-not-usage-limits
+    category: routing-trap
+    host_model: control
+    host_state:
+      hosts: connected
+    note: >-
+      Reverse trap. Connection and load across the other machines is
+      daintree.hosts.survey-hosts: "whether the Remote Hosts are connected, how busy each is".
+      Nothing asks for allowance, so daintree.agents.check-usage-limits is excluded; survey-hosts
+      fences "agent usage left on each machine (daintree.agents.check-usage-limits)" the other way.
+    messages:
+      - role: user
+        content: are all my remote hosts connected and how busy is each one right now
+    expect:
+      required: [daintree.hosts.survey-hosts]
+      optional: [daintree.hosts.foundation, daintree.foundation]
+
+  - id: hosts-compact-each-host-not-usage-limits
+    category: routing-trap
+    host_model: control
+    host_state:
+      hosts: connected
+    note: >-
+      Reverse trap. A slash command that is not a usage view, in agents already open on the
+      hosts, is daintree.agents.run-agent-command ("an agent that is already open should run one
+      of its OWN CLI slash commands"); check-usage-limits fences "any other of the agent's own
+      slash commands (daintree.agents.run-agent-command)" and is excluded.
+    messages:
+      - role: user
+        content: run /compact in the claude agent on each of my remote hosts
+    expect:
+      required: [daintree.agents.run-agent-command]
+      optional: [daintree.hosts.foundation, daintree.foundation]
