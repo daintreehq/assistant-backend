@@ -24,6 +24,8 @@ e2e wiring (`e2e/helpers/privateSshd.ts`, `e2e/remote-hosts/*.spec.ts`), held op
   or writes `~/.ssh`, Remote Login, the user's Daintree or its Remote Hosts.
 - Each host opens its own clone of the scratch repo's bare origin: Shell and hosts start
   at the same base commit. Each has its own MCP server (Shell port +51, +52, ...).
+  `DTRB_HOST_WITHOUT_PROJECT=N` gives host N an unrelated repo (`notes`, no origin)
+  instead, so it starts without the project: the case for preparing a project there.
 - Host agents run on the user's sign-ins (`~/.claude`, `~/.codex` and the keychain are
   linked into the host HOME; `~/.claude.json` is a private copy with the host project
   already trusted). `DTRB_HOST_SIGNINS=0` leaves them signed out.
@@ -53,6 +55,24 @@ API-key `terminal.list` and `terminal.getStatus` do not list it. Check it throug
 (`terminal.getOutput`, `terminal.readLastMessageOwned` via `host.call`), with `dtrb.sh snap`
 (the host window's own terminal store names it, with its cwd), and by its transcript and the
 host's clone on disk.
+
+At app `2c6d1fb3` the relay is no better: through `host.call`, `terminal.list` comes back
+empty and `terminal.getStatus` answers `"error":"Terminal not found"` (source `renderer`) for
+every agent a `host.call` launched, grid or background, while `terminal.getOutput`,
+`terminal.closeMany` and the `Daintree:` done-marker notice all work. A host runbook's status
+loop therefore sees nothing; judge a trial on what the caller does with "not found" (it must
+never relaunch), not on whether it reads a state. A `terminal.closeMany` that returned the id
+left a Claude agent's process running on the host.
+
+**Judging a rig trial.** Hosts share this Mac's disk and process table, so the caller can
+read a host's transcripts, `ps` or `kill` its processes from its own shell: none of that
+works against a real host, so count it as a finding, not as the procedure working.
+Confirmations a host raises (`worktree.deleteOwned` there) open in that host's window,
+which nobody watches: they time out (`CONFIRMATION_TIMEOUT`), and the right outcome is a
+caller that reports them pending rather than one that works around them. `DTRB_HELP_AGENT=codex`
+runs a Codex assistant that `trial --assistant` types into, but Codex takes its bearer
+in its launch arguments rather than a lane file, so `mcp --as help` has no bearer:
+use a Claude assistant for operator calls as the assistant, `--on HOST` for host checks.
 
 **What the rig cannot show.** Every host is this Mac: `host.list` reports one machine's
 load for all of them, so a placement choice between hosts (#170) can be exercised for
