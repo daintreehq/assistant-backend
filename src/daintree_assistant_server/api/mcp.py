@@ -39,6 +39,7 @@ from ..runbook_mcp import (
 )
 from ..runbooks.catalog import view_for
 from ..runbooks.host_state import HOSTS_HEADER, parse_host_state
+from ..runbooks.local.runtime import RankTrace
 
 router = APIRouter()
 logger = get_logger("daintree.mcp")
@@ -85,6 +86,8 @@ async def mcp_post(request: Request) -> Response:
     host_state = parse_host_state(values[0]) if len(values) == 1 else None
     view = view_for(container.catalog, host_state)
     selector = container.selector
+    # Filled by the inference pool if this request searches.
+    trace = RankTrace()
 
     reply = await handle_message(
         message,
@@ -94,7 +97,9 @@ async def mcp_post(request: Request) -> Response:
             name=_header(request, "mcp-name"),
         ),
         catalog=view.catalog,
-        search=lambda query, limit: selector.search(query, limit=limit, exclude=view.exclude),
+        search=lambda query, limit: selector.search(
+            query, limit=limit, exclude=view.exclude, trace=trace
+        ),
         delivered=(record := sessions.delivered(_header(request, "mcp-session-id"))),
         attach=view.attach,
     )
@@ -103,17 +108,27 @@ async def mcp_post(request: Request) -> Response:
         # Every handshake starts a session afresh, so a client that reconnects is
         # sent its supporting runbooks again.
         session_id = sessions.open()
-    # Metadata only. The query is user content and stays out of the log plane.
+    # Rendered first: only a reply that serialized marks its runbooks as sent.
+    response = _send(reply)
+    # Metadata only: bounded labels, counts and timings. The query, the ids and
+    # names a caller sent, and the procedures served stay out of the log plane.
     logger.info(
         "mcp_request",
         rpc_method=reply.method,
         status=reply.status,
-        results=reply.results,
+        tool=reply.tool,
+        outcome=reply.outcome,
+        ranked=reply.ranked,
+        selected=reply.selected,
+        supporting_full=reply.supporting_full,
+        supporting_named=reply.supporting_named,
+        inference=trace.outcome,
+        queue_wait_ms=trace.queue_wait_ms,
+        rank_ms=trace.rank_ms,
+        bytes=len(response.body),
         hosts=host_state.hosts if host_state is not None else None,
         duration_ms=round((time.perf_counter() - started) * 1000, 1),
     )
-    # Rendered first: only a reply that serialized marks its runbooks as sent.
-    response = _send(reply)
     if record is not None:
         record.update(reply.sent_in_full)
     if session_id is not None:

@@ -33,8 +33,8 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, replace
+from typing import Any, Literal
 
 from . import __version__
 from .runbooks.catalog import Catalog
@@ -294,6 +294,32 @@ UNSUPPORTED_PROTOCOL_VERSION = -32022
 
 SearchFn = Callable[[str, int], Awaitable[list[RunbookSearchHit] | None]]
 
+#: How a tool call ended, for the log line. A fixed vocabulary: whatever the
+#: caller sent, the log records one of these, never its text.
+ToolOutcome = Literal[
+    "selected",  # search answered, at least one result selected
+    "none_selected",  # search answered, a ranking with nothing selected
+    "found",  # get_runbook returned the runbook asked for
+    "unknown_id",  # get_runbook: no public runbook has that id
+    "invalid_arguments",  # either tool: arguments it could not accept
+    "unavailable",  # search: the classifier could not answer (retryable)
+    "unknown_tool",  # tools/call naming neither tool
+]
+
+#: Methods the log line names. Any other is logged as ``other``: a method is a
+#: caller-controlled string, and an unknown one is unbounded.
+_LOGGED_METHODS = frozenset(
+    {
+        "initialize",
+        "server/discover",
+        "ping",
+        "tools/list",
+        "tools/call",
+        "notifications/initialized",
+        "notifications/cancelled",
+    }
+)
+
 
 @dataclass(frozen=True)
 class McpReply:
@@ -301,9 +327,17 @@ class McpReply:
 
     status: int
     body: dict[str, Any] | None
-    #: For the log line only — never echoed to the client.
+    #: For the log line only — never echoed to the client. Every field is a
+    #: bounded label or a count: nothing here is the caller's text.
     method: str | None = None
-    results: int | None = None
+    tool: str | None = None
+    outcome: ToolOutcome | None = None
+    #: Search: results returned (neighbours included), and how many are selected.
+    ranked: int | None = None
+    selected: int | None = None
+    #: Prerequisites sent in full, and named instead as sent earlier.
+    supporting_full: int | None = None
+    supporting_named: int | None = None
     #: (runbook id, content hash) of everything this reply carries in full, for the
     #: transport to add to the session's record once the reply has been rendered.
     sent_in_full: tuple[tuple[str, str], ...] = ()
@@ -332,7 +366,6 @@ def _result(
     result: dict[str, Any],
     *,
     method: str,
-    results: int | None = None,
     sent_in_full: tuple[tuple[str, str], ...] = (),
 ) -> McpReply:
     # `resultType` is required on every 2026-07-28 result; clients of the
@@ -345,9 +378,12 @@ def _result(
             "result": {"resultType": "complete", **result},
         },
         method=method,
-        results=results,
         sent_in_full=sent_in_full,
     )
+
+
+def _logged_method(method: str) -> str:
+    return method if method in _LOGGED_METHODS else "other"
 
 
 def _unsupported(request_id: Any, requested: str) -> McpReply:
@@ -412,7 +448,7 @@ async def handle_message(
         # A notification (`notifications/initialized`, `notifications/cancelled`,
         # ...). Nothing here has state for one to change; the transport answer is
         # 202 with no body, and a JSON-RPC body would be a protocol violation.
-        return McpReply(status=202, body=None, method=method)
+        return McpReply(status=202, body=None, method=_logged_method(method))
 
     request_id = message["id"]
     if not _valid_id(request_id):
@@ -490,7 +526,10 @@ async def handle_message(
             # a session, and such a caller is always sent everything.
             delivered = None
         return await _call_tool(request_id, params, headers, catalog, search, delivered, attach)
-    return error_reply(request_id, METHOD_NOT_FOUND, f"Method not found: {method}")
+    return replace(
+        error_reply(request_id, METHOD_NOT_FOUND, f"Method not found: {method}"),
+        method=_logged_method(method),
+    )
 
 
 async def _call_tool(
@@ -509,13 +548,17 @@ async def _call_tool(
         )
     if name not in TOOL_NAMES:
         # A protocol error, not a tool error: there is no tool to have failed.
-        return error_reply(request_id, INVALID_PARAMS, f"Unknown tool: {name}")
+        return replace(
+            error_reply(request_id, INVALID_PARAMS, f"Unknown tool: {name}"),
+            method="tools/call",
+            outcome="unknown_tool",
+        )
 
     arguments = params.get("arguments", {})
     if arguments is None:
         arguments = {}
     if not isinstance(arguments, dict):
-        return _tool_error(request_id, "`arguments` must be an object.")
+        return _invalid(request_id, name, "`arguments` must be an object.")
 
     # Argument problems are TOOL errors (isError), not JSON-RPC errors: the spec
     # routes them back to the model, which can read the message and correct the
@@ -535,26 +578,31 @@ async def _search_runbooks(
 ) -> McpReply:
     unknown = sorted(set(arguments) - {"query", "max_results"})
     if unknown:
-        return _tool_error(request_id, f"Unknown argument(s): {', '.join(unknown)}.")
+        return _invalid(request_id, TOOL_NAME, f"Unknown argument(s): {', '.join(unknown)}.")
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
-        return _tool_error(request_id, "`query` must be a non-empty string.")
+        return _invalid(request_id, TOOL_NAME, "`query` must be a non-empty string.")
     if len(query) > MAX_QUERY_CHARS:
-        return _tool_error(request_id, f"`query` is longer than {MAX_QUERY_CHARS} characters.")
+        return _invalid(
+            request_id, TOOL_NAME, f"`query` is longer than {MAX_QUERY_CHARS} characters."
+        )
     max_results = arguments.get("max_results", DEFAULT_MAX_RESULTS)
     if (
         not isinstance(max_results, int)
         or isinstance(max_results, bool)
         or not 1 <= max_results <= MAX_RESULTS_CAP
     ):
-        return _tool_error(
-            request_id, f"`max_results` must be an integer from 1 to {MAX_RESULTS_CAP}."
+        return _invalid(
+            request_id, TOOL_NAME, f"`max_results` must be an integer from 1 to {MAX_RESULTS_CAP}."
         )
 
     hits = await search(query.strip(), max_results)
     if hits is None:
         return _tool_error(
-            request_id, "Runbook search is temporarily unavailable. Try again shortly."
+            request_id,
+            TOOL_NAME,
+            "unavailable",
+            "Runbook search is temporarily unavailable. Try again shortly.",
         )
 
     runbooks: list[dict[str, Any]] = []
@@ -581,7 +629,12 @@ async def _search_runbooks(
         "runbooks": runbooks,
         "supporting_runbooks": supporting,
     }
-    return _tool_result(request_id, structured, results=len(runbooks), sent_in_full=sent)
+    return replace(
+        _tool_result(request_id, TOOL_NAME, structured, supporting, sent_in_full=sent),
+        outcome="selected" if selected else "none_selected",
+        ranked=len(runbooks),
+        selected=len(selected),
+    )
 
 
 def _get_runbook(
@@ -593,10 +646,10 @@ def _get_runbook(
 ) -> McpReply:
     unknown = sorted(set(arguments) - {"id"})
     if unknown:
-        return _tool_error(request_id, f"Unknown argument(s): {', '.join(unknown)}.")
+        return _invalid(request_id, GET_TOOL_NAME, f"Unknown argument(s): {', '.join(unknown)}.")
     runbook_id = arguments.get("id")
     if not isinstance(runbook_id, str) or not runbook_id.strip():
-        return _tool_error(request_id, "`id` must be a non-empty runbook id.")
+        return _invalid(request_id, GET_TOOL_NAME, "`id` must be a non-empty runbook id.")
     runbook_id = runbook_id.strip()
     runbook = catalog.get_public(runbook_id) if len(runbook_id) <= MAX_ID_CHARS else None
     if runbook is None:
@@ -605,6 +658,8 @@ def _get_runbook(
         # not echoed — it is caller-controlled text.
         return _tool_error(
             request_id,
+            GET_TOOL_NAME,
+            "unknown_id",
             "No runbook has that id. Use search_runbooks to find one by task.",
         )
     supporting, sent = _supporting(
@@ -617,7 +672,10 @@ def _get_runbook(
         "runbook": _document(runbook),
         "supporting_runbooks": supporting,
     }
-    return _tool_result(request_id, structured, results=1, sent_in_full=sent)
+    return replace(
+        _tool_result(request_id, GET_TOOL_NAME, structured, supporting, sent_in_full=sent),
+        outcome="found",
+    )
 
 
 def _document(runbook: Runbook) -> dict[str, Any]:
@@ -672,12 +730,14 @@ def _supporting(
 
 def _tool_result(
     request_id: Any,
+    tool: str,
     structured: dict[str, Any],
+    supporting: list[dict[str, Any]],
     *,
-    results: int,
     sent_in_full: tuple[tuple[str, str], ...] = (),
 ) -> McpReply:
-    return _result(
+    named = sum("note" in entry for entry in supporting)
+    reply = _result(
         request_id,
         {
             # The text block is the same JSON: clients that predate
@@ -693,12 +753,18 @@ def _tool_result(
             "isError": False,
         },
         method="tools/call",
-        results=results,
         sent_in_full=sent_in_full,
+    )
+    return replace(
+        reply, tool=tool, supporting_full=len(supporting) - named, supporting_named=named
     )
 
 
-def _tool_error(request_id: Any, message: str) -> McpReply:
+def _invalid(request_id: Any, tool: str, message: str) -> McpReply:
+    return _tool_error(request_id, tool, "invalid_arguments", message)
+
+
+def _tool_error(request_id: Any, tool: str, outcome: ToolOutcome, message: str) -> McpReply:
     return McpReply(
         status=200,
         body={
@@ -711,4 +777,6 @@ def _tool_error(request_id: Any, message: str) -> McpReply:
             },
         },
         method="tools/call",
+        tool=tool,
+        outcome=outcome,
     )
