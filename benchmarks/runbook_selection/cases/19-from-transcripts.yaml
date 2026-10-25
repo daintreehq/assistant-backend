@@ -1066,3 +1066,106 @@ cases:
     expect:
       required: [daintree.orchestration.fan-out-work]
       optional: [daintree.foundation, daintree.hosts.foundation]
+
+  # The live host rig (Shell + isolated Remote Hosts, the Shell's own Daintree Assistant
+  # as caller), 2026-10-25, app 2c6d1fb3: the assistant's own search_runbooks queries.
+  - id: tx-journey-host-which-finished
+    category: single-runbook
+    note: >-
+      Claude session ca8a7806 (Shell assistant), 2026-10-25: after a restart, which
+      pieces handed to a host finished. Selected recover-and-clean-up at 1.000; with no
+      record of the hand-over it asked rather than rebuilding a task list from the host
+      (step 1). Decided by its "which delegated pieces finished, which are still running".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          After a Daintree restart, check which work handed to a remote host finished and
+          which is still running
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: tx-journey-host-restart-reconcile
+    category: single-runbook
+    note: >-
+      Claude session 915418a7 (Shell assistant), 2026-10-25: the coordinator's
+      conversation was replaced mid-run with a worker still going on a host. Its query
+      selected daintree.hosts.prepare-host-maintenance at 0.997 (recover-and-clean-up
+      0.050); it recovered only because that runbook's fence names "an unplanned restart
+      or dropped link already behind us (daintree.hosts.recover-and-clean-up)". Nothing
+      about the host restarting is ahead, so the maintenance runbook is the wrong owner; it is
+      not forbidden here only because forbidding it would turn the honest miss into a gate
+      failure until a retrain wins the case.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Reconcile with an agent still running on a remote host after restart, without
+          relaunching it
+    expect:
+      required: [daintree.hosts.recover-and-clean-up]
+      optional: [daintree.hosts.foundation]
+
+  - id: tx-journey-host-delegate-checkpointed
+    category: single-runbook
+    note: >-
+      Claude session f36affc4 (Shell assistant), 2026-10-25: one task to one host agent,
+      commit and push, with a run checkpoint kept. Selected delegate-to-host; it launched
+      once under a newCallId and did not relaunch when the host answered "Terminal not
+      found".
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Hand a coding task to one agent on a remote host, have it commit and push, and
+          keep a checkpoint
+    expect:
+      required: [daintree.hosts.delegate-to-host]
+      optional: [daintree.hosts.foundation]
+
+  - id: tx-journey-host-backlog-file
+    category: single-runbook
+    note: >-
+      Claude session behind trial s2s6 (Shell assistant), 2026-10-25: a backlog file on
+      two hosts, cap one each, refilled, merged here; then "stop assigning", "cancel
+      everything now" and "clean up". Selected drain-issue-backlog ("keep both hosts'
+      slots full until nothing is left", merges here).
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: >-
+          Work through a backlog file using agents on two remote hosts, one agent per host
+          at a time, merging each finished branch into main and pushing
+    expect:
+      required: [daintree.hosts.drain-issue-backlog]
+      optional: [daintree.hosts.foundation]
+
+  - id: tx-journey-host-assistant-questions
+    category: single-runbook
+    note: >-
+      Claude session behind trial s5 (Shell assistant), 2026-10-25: three host
+      assistants (one decided question, one publish approval, one resting) and one
+      disconnected host. Selected answer-assistant-questions.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Check my Daintree assistants on every machine and answer what they're asking
+    expect:
+      required: [daintree.hosts.answer-assistant-questions]
+      optional: [daintree.hosts.foundation]
+
+  - id: tx-journey-host-prepare-then-fix
+    category: multi-runbook
+    note: >-
+      Codex rollout 01a17338 (Shell assistant), 2026-10-25: a host without the project,
+      then a fix there. Selected prepare-project-for-work with delegate-to-host and
+      reassign-host-work; it called host.ensureProject and stopped to ask when the app
+      refused it, guessing no clone or push.
+    host_state: {hosts: connected}
+    messages:
+      - role: user
+        content: Move this project onto another host and launch an agent to fix commit and push
+    expect:
+      required: [daintree.hosts.prepare-project-for-work]
+      optional: [daintree.hosts.delegate-to-host, daintree.hosts.foundation]
