@@ -34,10 +34,9 @@ cases:
       daintree.orchestration.status-and-resume ("what is still open or in flight ... pick
       up / resume something from an earlier session") even with a host connected, and not
       daintree.hosts.recover-and-clean-up, which excludes "agents, terminals or worktrees on
-      this machine". Measured before any change: the shipped selector picks
-      daintree.orchestration.fan-out-work, daintree.orchestration.park-work and
-      daintree.agents.hand-off-task (rank_miss); recorded as an honest miss for the global
-      caller work to win.
+      this machine". It was a candidate_miss (park-work, fan-out-work and
+      drain-issue-backlog won) until status-and-resume's whenToUse named continuing
+      unfinished work across every project on this machine (#167).
     host_state: {hosts: connected}
     messages:
       - role: user
