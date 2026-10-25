@@ -17,7 +17,7 @@ from typing import Protocol
 from ...contracts.openai import ChatMessage
 from ..catalog import Catalog
 from .documents import fit_query
-from .runtime import InferencePool
+from .runtime import InferencePool, RankTrace
 from .setwise import Selection, SetwiseClassifier
 
 #: The cardinality head's cap on what it would admit. It decides ``selected``,
@@ -47,7 +47,12 @@ class RunbookSelector(Protocol):
     signatures against each other."""
 
     async def search(
-        self, query: str, *, limit: int, exclude: frozenset[str] = frozenset()
+        self,
+        query: str,
+        *,
+        limit: int,
+        exclude: frozenset[str] = frozenset(),
+        trace: RankTrace | None = None,
     ) -> list[RunbookSearchHit] | None: ...
 
 
@@ -65,7 +70,12 @@ class LocalSelector:
         self._catalog = catalog
 
     async def search(
-        self, query: str, *, limit: int, exclude: frozenset[str] = frozenset()
+        self,
+        query: str,
+        *,
+        limit: int,
+        exclude: frozenset[str] = frozenset(),
+        trace: RankTrace | None = None,
     ) -> list[RunbookSearchHit] | None:
         """Rank the selectable catalog against ``query``; the top ``limit`` hits.
 
@@ -79,7 +89,8 @@ class LocalSelector:
         catalog ranks as if those runbooks were not there.
 
         ``None`` when the model could not answer (pool refused, graph failed),
-        distinct from ``[]``, which is an honest empty catalog.
+        distinct from ``[]``, which is an honest empty catalog. ``trace`` is
+        passed to the pool, which records which it was (``InferencePool.run``).
         """
         catalog = self._catalog
         classifier = self._classifier
@@ -98,7 +109,7 @@ class LocalSelector:
                 text, [], catalog=catalog, max_active=MAX_SELECTED, exclude=exclude
             )
 
-        result = await self._pool.run(rank)
+        result = await self._pool.run(rank, trace)
         if result is None:
             return None
         selected = set(result.runbook_ids)

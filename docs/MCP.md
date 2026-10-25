@@ -181,6 +181,14 @@ for clients that predate structured output. Both tools declare `outputSchema` an
   unsupported version `-32022` with `data.supported`. A foreign `Origin` is `403`
   (DNS-rebinding defence), a non-JSON `Content-Type` `415`, a body over 64 KiB `413`,
   and a server that is still starting `503`.
+- **What is logged.** One `mcp_request` line per request, of bounded labels, counts and
+  timings only: `rpc_method` (an unrecognised method is `other`), `status`, `tool`,
+  `outcome` (`selected`, `none_selected`, `found`, `unknown_id`, `invalid_arguments`,
+  `unavailable`, `unknown_tool`), `ranked` and `selected` counts for a search,
+  `supporting_full` and `supporting_named`, the inference pool's verdict on a search
+  (`inference`: `ok`, `pool_full`, `timeout`, `failed`, `closed`) with its
+  `queue_wait_ms` and `rank_ms`, the response `bytes`, the coarse `hosts` state and
+  `duration_ms`. Never a query, an id or name the caller sent, or a procedure's text.
 
 The protocol lives in `src/daintree_assistant_server/runbook_mcp.py`; the HTTP
 transport in `api/mcp.py`; the session record in `mcp_sessions.py`. `tests/integration/test_runbook_mcp.py` drives both eras

@@ -34,7 +34,7 @@ import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 from ...observability import get_logger
 
@@ -109,6 +109,27 @@ class PoolStats:
         return self.queue_wait_ms_total / self.queue_waits if self.queue_waits else 0.0
 
 
+#: How one ``run`` ended: answered, or which fail-open path it took. ``closed`` is
+#: a pool shutting down under a request still in flight.
+RankOutcome = Literal["ok", "pool_full", "timeout", "failed", "closed"]
+
+
+@dataclass
+class RankTrace:
+    """One ``run``, as the request that made it sees it: content-free, for its log line.
+
+    The same measurements ``PoolStats`` accumulates, kept per call so a request's
+    outcome and tail latency can be read off its own record. Written by the pool;
+    ``None`` is what the pool never reached (no wait to time on a refused call, or
+    a timeout that fired before a worker picked the call up).
+    """
+
+    outcome: RankOutcome | None = None
+    queue_wait_ms: float | None = None
+    #: Time ``fn`` itself ran on the worker; set only on ``ok``.
+    rank_ms: float | None = None
+
+
 class InferencePool:
     """Bounded thread pool for CPU-bound ranking work."""
 
@@ -140,9 +161,14 @@ class InferencePool:
         self._queue_waits = 0
         self._closed = False
 
-    async def run(self, fn: Callable[[], T]) -> T | None:
-        """Run ``fn`` on a worker. ``None`` means the caller should fail open."""
+    async def run(self, fn: Callable[[], T], trace: RankTrace | None = None) -> T | None:
+        """Run ``fn`` on a worker. ``None`` means the caller should fail open.
+
+        ``trace``, when given, is filled in with how this one call went.
+        """
+        trace = trace if trace is not None else RankTrace()
         if self._closed:
+            trace.outcome = "closed"
             return None
         self._submitted += 1
 
@@ -156,6 +182,7 @@ class InferencePool:
             # should, because the alternative to a short wait is a ~2.0s upstream
             # call (see RANK_TIMEOUT_SECONDS).
             self._rejected_full += 1
+            trace.outcome = "pool_full"
             _log.warning("runbook_rank_pool_full", depth=self._queue_depth)
             return None
 
@@ -177,13 +204,22 @@ class InferencePool:
         # thread and read from the loop; a float assignment is atomic under the
         # GIL and this is a diagnostic counter, so no lock.
         submitted_at = time.perf_counter()
+        # This call's own spans, copied into ``trace`` from the loop once it stops
+        # waiting, so a worker that outlives a timeout never writes a finished record.
+        waited: float | None = None
+        ran_ms: float | None = None
 
         def timed() -> T:
+            nonlocal waited, ran_ms
             waited_ms = (time.perf_counter() - submitted_at) * 1000.0
             self._queue_wait_ms_total += waited_ms
             self._queue_wait_ms_max = max(self._queue_wait_ms_max, waited_ms)
             self._queue_waits += 1
-            return fn()
+            waited = round(waited_ms, 1)
+            began = time.perf_counter()
+            result = fn()
+            ran_ms = round((time.perf_counter() - began) * 1000.0, 1)
+            return result
 
         future = loop.run_in_executor(self._executor, timed)
         # The slot is released when the UNDERLYING work finishes, not when this
@@ -209,15 +245,21 @@ class InferencePool:
             # returns skips `else` entirely, so the completion counter would have
             # read zero forever while the pool worked perfectly.
             self._completed += 1
+            trace.outcome = "ok"
+            trace.rank_ms = ran_ms
             return result
         except TimeoutError:
             self._timed_out += 1
+            trace.outcome = "timeout"
             _log.warning("runbook_rank_timeout", timeout_s=self._timeout)
             return None
         except Exception:  # noqa: BLE001 - fail open on anything the model does
             self._failed += 1
+            trace.outcome = "failed"
             _log.warning("runbook_rank_failed", exc_info=True)
             return None
+        finally:
+            trace.queue_wait_ms = waited
 
     def stats(self) -> PoolStats:
         return PoolStats(
