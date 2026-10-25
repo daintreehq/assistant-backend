@@ -20,13 +20,16 @@
 //   help-session.json        the Shell's own assistant: its bearer and terminal id, 0600
 //   provision-help           a file: (re)start that assistant and rewrite help-session.json
 //   snap                     a file: screenshot and dump the terminals of every instance
+//   global-session.json      with DTRB_GLOBAL_AGENT: the global Assistant's terminal id, agent, generation
+//   restart-app              a file: quit the Shell and relaunch it on the same user data, as a
+//                            person restarting Daintree; hosts stay up and are reconnected
 //
 // DTRB_HOSTS=1|2 also starts that many Remote Hosts (hosts.ts), seeded with the projects
 // in DTRB_HOST_PROJECTS (colon-separated), and adds them to this Shell before state.json.
 import { test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { launchApp, closeApp, type AppContext } from "../helpers/launch";
+import { launchApp, closeApp, refreshActiveWindow, waitForActiveProject, type AppContext } from "../helpers/launch";
 import { openAndOnboardProject } from "../helpers/project";
 import { getTerminalTextById } from "../helpers/terminal";
 import { planChoice } from "../../shared/utils/terminalChoice";
@@ -48,6 +51,9 @@ const HELP_TIER = (process.env.DTRB_HELP_TIER ?? "core") as "core" | "full";
 // The sidebar's own lane, where a person's assistant runs.
 const HELP_SLOT = 0;
 const HELP_AGENT = process.env.DTRB_HELP_AGENT ?? "claude";
+// The installation's global Assistant (no project, no panel), run as this agent: set as the
+// isolated app's own assistant agent, then started the way its panel starts it. Empty: off.
+const GLOBAL_AGENT = process.env.DTRB_GLOBAL_AGENT ?? "";
 const POLL_MS = 3_000;
 const FIRST_WORK_MS = 3 * 60_000;
 
@@ -113,6 +119,15 @@ function newestLaneBearer(root: string, slot: number, since: number): { token: s
   return found ? { token: found.token, sessionId: found.sessionId } : null;
 }
 
+/** A raw PTY stream as roughly the text a screen shows: escapes dropped, carriage returns as breaks. */
+const plainText = (raw: string) =>
+  raw
+    .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, "")
+    .replace(/\x1b\[[0-9;?<>=]*[ -\/]*[@-~]/g, "")
+    .replace(/\x1b[@-Z\\-_]/g, "")
+    .replace(/\r(?!\n)/g, "\n")
+    .replace(/\n{3,}/g, "\n\n");
+
 const isAgent = (t: TerminalInfo) =>
   Boolean(t.launchAgentId ?? t.detectedAgentId) && t.launchAgentId !== "terminal";
 
@@ -127,10 +142,14 @@ test.afterAll(async () => {
 });
 
 /** Project tier and confirmations, then this instance's own MCP server on its own port. */
-async function configureInstance(page: any, port: number): Promise<{ projectId: string; status: any; saved: any }> {
-  const projectId: string | null = await page.evaluate(
-    () => (window as any).__DAINTREE_INITIAL_PROJECT__?.id ?? null
-  );
+async function configureInstance(
+  page: any,
+  port: number,
+  knownProjectId?: string
+): Promise<{ projectId: string; status: any; saved: any }> {
+  // A relaunch reopens the project itself, so onboarding's id is absent: the caller names it.
+  const projectId: string | null =
+    knownProjectId ?? (await page.evaluate(() => (window as any).__DAINTREE_INITIAL_PROJECT__?.id ?? null));
   if (!projectId) throw new Error("no project id after onboarding");
   const settings = await page.evaluate((id: string) => (window as any).electron.project.getSettings(id), projectId);
   await page.evaluate(
@@ -195,13 +214,15 @@ test("hold an isolated Daintree for runbook trials", async () => {
     shellEnv.DAINTREE_SSH = rigSsh.wrapper;
     shellEnv.PATH = `${rigSsh.binDir}:${process.env.PATH ?? ""}`;
   }
-  ctx = await launchApp({
-    userDataDir: path.join(RUN_DIR, "userdata"),
-    isolateHome: false,
-    env: shellEnv,
-    // Beside the hosts: a plain launch reaps every app this worker started.
-    alongside: hosts.length > 0,
-  });
+  const launchShell = () =>
+    launchApp({
+      userDataDir: path.join(RUN_DIR, "userdata"),
+      isolateHome: false,
+      env: shellEnv,
+      // Beside the hosts: a plain launch reaps every app this worker started.
+      alongside: hosts.length > 0,
+    });
+  ctx = await launchShell();
   // Daintree's global "Skip permission prompts for agents" (adds each CLI's
   // dangerous args). Set BEFORE the project opens: the project's renderer caches
   // agent settings when it loads, and a launch reads that cache, so setting it
@@ -209,7 +230,19 @@ test("hold an isolated Daintree for runbook trials", async () => {
   await ctx.window.evaluate((v: boolean) => (window as any).electron.agentSettings.setGlobal(v), SKIP_PERMS);
   // The Shell's own assistant tier, before any help session is provisioned.
   await ctx.window.evaluate((t: string) => (window as any).electron.helpAssistant.setSettings({ tier: t }), HELP_TIER);
-  const page = await openAndOnboardProject(ctx.app, ctx.window, PROJECT);
+  // The global Assistant's agent (the assistant's own default) and permission mode, in this
+  // instance's own settings only.
+  if (GLOBAL_AGENT) {
+    await ctx.window.evaluate(
+      (agentId: string) => (window as any).electron.agentDefaults.set({ assistantAgentId: agentId }),
+      GLOBAL_AGENT
+    );
+    await ctx.window.evaluate(
+      (bypass: boolean) => (window as any).electron.helpAssistant.setSettings({ bypassPermissions: bypass }),
+      SKIP_PERMS
+    );
+  }
+  let page = await openAndOnboardProject(ctx.app, ctx.window, PROJECT);
   ctx.window = page;
   holderLog(`app up, project ${PROJECT} open`);
 
@@ -256,6 +289,60 @@ test("hold an isolated Daintree for runbook trials", async () => {
   };
   if ((process.env.DTRB_ASSISTANT ?? "1") === "1") await startAssistant();
 
+  // The global Assistant: one per installation, run by main with no project and no panel
+  // (#14159). Started through the IPC its panel uses; its screen is read from the PTY's data
+  // stream, tapped in this window, since no panel renders it.
+  let globalTerminalId = "";
+  const startGlobal = async () => {
+    const ensured = await page
+      .evaluate(() => (window as any).electron.help.ensureGlobalAssistant())
+      .catch((e: unknown) => ({ error: String(e) }));
+    let st: any = ensured;
+    for (let i = 0; i < 90 && !(st?.phase === "running" && st?.terminalId); i++) {
+      await page.waitForTimeout(1000);
+      st = await page.evaluate(() => (window as any).electron.help.getGlobalAssistantState()).catch(() => st);
+    }
+    if (!(st?.phase === "running" && st?.terminalId)) {
+      holderLog(`global assistant not started: ${JSON.stringify(ensured).slice(0, 400)}; now ${JSON.stringify(st).slice(0, 300)}`);
+      return;
+    }
+    globalTerminalId = String(st.terminalId);
+    const attached = await page.evaluate(() => (window as any).electron.help.attachGlobalAssistant()).catch(() => null);
+    if (attached?.attachmentId) {
+      await page
+        .evaluate((id: string) => (window as any).electron.help.claimGlobalAssistantInput(id), attached.attachmentId)
+        .catch((e: unknown) => holderLog(`global claim input: ${e}`));
+    }
+    await page.evaluate((id: string) => {
+      const w = window as any;
+      w.__dtrbGlobal = "";
+      const decoder = new TextDecoder();
+      w.electron.terminal.onData(id, (data: string | Uint8Array) => {
+        const text = typeof data === "string" ? data : decoder.decode(data);
+        w.__dtrbGlobal = (w.__dtrbGlobal + text).slice(-400_000);
+        w.electron.terminal.acknowledgeData(id, text.length);
+      });
+    }, globalTerminalId);
+    const file = path.join(RUN_DIR, "global-session.json");
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ terminalId: globalTerminalId, agentId: st.agentId, generation: st.generation, at: stamp() }, null, 2)
+    );
+    holderLog(`global assistant ${st.agentId} ${globalTerminalId} running (generation ${st.generation})`);
+  };
+  const globalText = async (): Promise<string> =>
+    globalTerminalId ? plainText(await page.evaluate(() => (window as any).__dtrbGlobal ?? "").catch(() => "")) : "";
+  // When its PTY last printed: the settle signal where the data tap stays empty.
+  const globalActivity = async (): Promise<string> =>
+    globalTerminalId
+      ? JSON.stringify(
+          await page
+            .evaluate((id: string) => (window as any).electron.terminal.getOutputActivity([id]), globalTerminalId)
+            .catch((e: unknown) => String(e))
+        )
+      : "";
+  if (GLOBAL_AGENT) await startGlobal();
+
   const state = {
     startedAt: stamp(),
     appPid: ctx.app.process().pid,
@@ -300,7 +387,60 @@ test("hold an isolated Daintree for runbook trials", async () => {
 
   // Between and during trials: a fresh help bearer on request, and the trust dialog
   // of any agent a host.call launched on a host (nobody sits at a host's window).
+  // dtrb.sh restart: Daintree quits and reopens on the same user data. The hosts keep
+  // running and are reconnected; the global Assistant is started again as its panel would.
+  const restartApp = async () => {
+    holderLog("restart: quitting the Shell");
+    await closeApp(ctx!.app);
+    globalTerminalId = "";
+    assistantTerminalId = "";
+    ctx = await launchShell();
+    await ctx.window.evaluate((v: boolean) => (window as any).electron.agentSettings.setGlobal(v), SKIP_PERMS);
+    // The relaunch reopens the project it closed on; open it by hand only if it did not.
+    const shell = ctx;
+    page = await waitForActiveProject(shell.app, await refreshActiveWindow(shell.app, shell.window), path.basename(PROJECT)).catch(
+      () => openAndOnboardProject(shell.app, shell.window, PROJECT)
+    );
+    ctx.window = page;
+    await configureInstance(page, MCP_PORT, projectId);
+    for (const h of hosts) {
+      await page.evaluate((hostId: string) => (window as any).electron.remoteHosts.connect({ hostId }), h.hostId!).catch(() => {});
+      for (let i = 0; i < 120; i++) {
+        const list = await page.evaluate(() => (window as any).electron.remoteHosts.list()).catch(() => []);
+        if ((list as any[]).find((r) => r.descriptor?.id === h.hostId)?.connection?.status === "connected") break;
+        await page.waitForTimeout(500);
+      }
+    }
+    if (GLOBAL_AGENT) await startGlobal();
+    const statePath = path.join(RUN_DIR, "state.json");
+    const prior = JSON.parse(fs.readFileSync(statePath, "utf8"));
+    fs.writeFileSync(statePath, JSON.stringify({ ...prior, appPid: ctx.app.process().pid, restartedAt: stamp() }, null, 2));
+    holderLog(`restart: Shell back up (pid ${ctx.app.process().pid})`);
+  };
+
+  const globalTrusted = new Set<string>();
   const serviceRig = async () => {
+    if (fs.existsSync(path.join(RUN_DIR, "restart-app"))) {
+      await restartApp().catch((e: unknown) => holderLog(`restart failed: ${e}`));
+      fs.rmSync(path.join(RUN_DIR, "restart-app"), { force: true });
+    }
+    if (globalTerminalId && !globalTrusted.has(globalTerminalId)) {
+      const text = (await globalText()).trimEnd();
+      if (TRUST_DIALOG.test(text.split("\n").slice(-30).join("\n"))) {
+        const plan = TRUST_LABELS.map((label) => planChoice(text, label)).find((p) => p.ok);
+        if (plan?.ok) {
+          globalTrusted.add(globalTerminalId);
+          holderLog(`global assistant: trust dialog; accepting`);
+          for (const key of plan.keys) {
+            await page.evaluate(
+              ([id, data]: [string, string]) => (window as any).electron.terminal.write(id, data),
+              [globalTerminalId, key === "Enter" ? "\r" : key === "Down" ? "\x1b[B" : "\x1b[A"] as [string, string]
+            );
+            await page.waitForTimeout(150);
+          }
+        }
+      }
+    }
     const req = path.join(RUN_DIR, "provision-help");
     if (fs.existsSync(req)) {
       await startAssistant().catch((e: unknown) => holderLog(`provision-help: ${e}`));
@@ -398,7 +538,21 @@ test("hold an isolated Daintree for runbook trials", async () => {
     if (Array.isArray(req.flags) && req.flags.length) args.agentLaunchFlags = req.flags;
     if (req.env) args.env = req.env;
     let launchResult: any;
-    if (req.assistant) {
+    if (req.global) {
+      // The caller is the installation's global Assistant: the prompt is typed into its
+      // PTY as the person would type it into its panel.
+      if (!globalTerminalId) {
+        launchResult = { error: "no global assistant running (DTRB_GLOBAL_AGENT unset, or it failed to start)" };
+      } else {
+        await page.evaluate(
+          ([id, text]: [string, string]) => (window as any).electron.terminal.write(id, text),
+          [globalTerminalId, String(req.prompt)] as [string, string]
+        );
+        await page.waitForTimeout(400);
+        await page.evaluate((id: string) => (window as any).electron.terminal.write(id, "\r"), globalTerminalId);
+        launchResult = { result: { terminalId: globalTerminalId } };
+      }
+    } else if (req.assistant) {
       // The caller is the Shell's own Daintree Assistant (help-* surface, host.*): the
       // prompt is typed into it as the person would, and it is the trial's pane.
       if (!assistantTerminalId) {
@@ -420,7 +574,7 @@ test("hold an isolated Daintree for runbook trials", async () => {
         launchResult = { error: String(e) };
       }
     }
-    log(req.assistant ? "typed into the assistant" : "launched", { args: { ...args, prompt: `${String(req.prompt).slice(0, 200)}…` }, launchResult });
+    log(req.global ? "typed into the global assistant" : req.assistant ? "typed into the assistant" : "launched", { args: { ...args, prompt: `${String(req.prompt).slice(0, 200)}…` }, launchResult });
 
     // The trial's own pane: the id the launch returned, else the first new agent pane.
     let trialTerminalId: string =
@@ -546,12 +700,16 @@ test("hold an isolated Daintree for runbook trials", async () => {
       const fleet = fresh
         .map((t) => `${t.id.slice(-8)} ${t.launchAgentId ?? t.detectedAgentId ?? "shell"} ${t.agentState ?? "-"}`)
         .join(" | ");
-      const tail = trialTerminalId
-        ? (await getTerminalTextById(page, trialTerminalId).catch(() => "")).trimEnd().split("\n").slice(-3).join(" / ")
-        : "";
+      const tail = req.global
+        ? (await globalText()).trimEnd().split("\n").slice(-3).join(" / ") + (await globalActivity())
+        : trialTerminalId
+          ? (await getTerminalTextById(page, trialTerminalId).catch(() => "")).trimEnd().split("\n").slice(-3).join(" / ")
+          : "";
       const busy = fresh.some((t) => t.agentState === "working");
       if (busy) sawWork = true;
       if (fleet + tail !== fingerprint) {
+        // The global Assistant has no panel state: its screen moving is its work.
+        if (req.global && fingerprint) sawWork = true;
         fingerprint = fleet + tail;
         lastChange = Date.now();
         log("fleet", { fleet, tail: tail.slice(0, 300) });
@@ -570,6 +728,7 @@ test("hold an isolated Daintree for runbook trials", async () => {
       const text = await getTerminalTextById(page, t.id).catch(() => "");
       fs.writeFileSync(path.join(dir, `terminal-${t.launchAgentId ?? t.detectedAgentId ?? "shell"}-${t.id.slice(-8)}.txt`), text);
     }
+    if (req.global) fs.writeFileSync(path.join(dir, `terminal-global-${globalTerminalId.slice(-8)}.txt`), await globalText());
     await page.screenshot({ path: path.join(dir, "99-final.png") });
     const done = {
       trialId,
