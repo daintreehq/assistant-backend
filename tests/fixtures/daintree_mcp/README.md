@@ -7,22 +7,24 @@ captured from the app itself rather than written by hand. All current runbooks
 (`runbooks/catalog/`) are checked against these captures. Retired v0.44 surfaces
 are historical material in `archive/inbox-v0.44/surfaces/`.
 
-**Source:** `daintreehq/daintree` commit `2c6d1fb3d46061ceb8526a88efdb60f04d6f6f57`,
+**Source:** `daintreehq/daintree` commit `62205c1f360f4de49191d2e06348e4031cd168b9`,
 `develop`, app 0.46.0. Captured 2026-10-25. This includes direct host control,
 assistant messaging through agent terminals, background agent placement,
 `terminal.placeOwned`, `host.ensureProject`, `host.settings`, and
 `project.runCommand` admitted to Daintree's own assistant at Core as at Full,
 the `host.call` throwaway target (app #14444-#14447), and the owned
-`terminal.restartOnPresetOwned`. The capture also ran 254 app host-control
+`terminal.restartOnPresetOwned`, the global Assistant listed from its own base
+manifest (app #14465), paged `host.list` project inventory, and no `Daintree-Hosts`
+header from any native CLI (app #14458). The capture also ran 273 app host-control
 contract tests.
 
 | file | tools | `mcp.surface` hash |
 |---|---|---|
 | `external.json` | 36 | `4fc679b0…` |
-| `global-core.json` | 0 (3 root tools) | `9a046ac9…` |
-| `global-full.json` | 0 (3 root tools) | `d75e9c00…` |
-| `help-core.json` | 46 | `909aebe4…` |
-| `help-full.json` | 94 | `2c9a0fd9…` |
+| `global-core.json` | 3 | `b95560c2…` |
+| `global-full.json` | 3 | `97602804…` |
+| `help-core.json` | 46 | `357a8bb5…` |
+| `help-full.json` | 94 | `ae2022a7…` |
 | `pane-core.json` | 80 | `37899dc6…` |
 | `pane-full.json` | 80 | `cd5a2894…` |
 | `relayed-core.json` | 39 | `3ebdfa2c…` |
@@ -76,13 +78,13 @@ admits only `capture.host_call.admits` (`GLOBAL_ALLOWED_TOOLS`) and refuses the 
 it launched there or the person handed it (Hand to orchestrator, Global Assistant);
 it closes only what it launched.
 
-At `2c6d1fb3` its `tools/list` is **empty**: it is listed from the viewless help base
-manifest, which carries no `host.*` entry, although dispatch admits the three root
-tools (`capture.notes`). The tests read the root tools' schemas from the help surface
-of the same Tool set and record the gap rather than hide it. `capture.native_setup`
+Its `tools/list` carries exactly its three root tools, from its own generated base
+manifest (`getGlobalAssistantBaseManifest`, app #14465; before it the listing was
+empty). `capture.native_setup`
 records the configuration contract the app's own helpers generate for its CLI besides the
 MCP (not observed launch wiring: the integration smoke still owes that): the `daintree-runbooks`
-server and its headers, the runbook instructions (owned tool names as written, through
+server and its headers (`Daintree-Host-Control` only: no `Daintree-Hosts`, so search
+offers it every procedure), the runbook instructions (owned tool names as written, through
 `host.call`), the checkpoint instructions, `DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR` (bucket
 `global`, kept across launches) and the scratch variable. These two files are
 callers, not listings, so they sit outside `SURFACES` in

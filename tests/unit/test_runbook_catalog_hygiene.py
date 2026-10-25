@@ -469,10 +469,10 @@ def test_the_global_assistant_is_its_own_caller() -> None:
 
 
 def test_the_global_assistants_listing_gap_stays_visible() -> None:
-    """What the global Assistant lists is recorded apart from what it may call: at the
-    captured commit its `tools/list` is empty, and the tests read its root tools'
-    schemas from the help surface rather than pretend they were listed. When a capture
-    lists them, `root_tools_listed` says so and the note goes."""
+    """What the global Assistant lists is recorded apart from what it may call. Since
+    app #14465 its `tools/list` carries its root tools; a capture that lists fewer
+    says so in `root_tools_listed` and a note, and the tests read the missing schemas
+    from the help surface rather than pretend they were listed."""
     for surface in GLOBAL_SURFACES:
         recorded = capture(surface)["capture"]
         listed = listed_action_ids(surface)
@@ -498,7 +498,8 @@ def test_the_runbooks_match_what_daintree_provisions_the_global_assistant() -> N
     for surface in GLOBAL_SURFACES:
         setup = capture(surface)["capture"]["native_setup"]
         assert setup["runbooks_mcp_server"] == "daintree-runbooks"
-        assert setup["runbooks_headers_connected"]["Daintree-Hosts"] == "connected"
+        # No host state is reported (app #14458): a header fixed at launch would go stale.
+        assert "Daintree-Hosts" not in setup["runbooks_headers"]
         addendum = setup["runbooks_addendum"]
         assert "you have no project of your own" in addendum
         assert "`terminal.sendCommandOwned`" in addendum and "as written" in addendum

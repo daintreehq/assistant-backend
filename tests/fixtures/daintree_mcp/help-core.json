@@ -2,7 +2,7 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "2c6d1fb3d46061ceb8526a88efdb60f04d6f6f57",
+    "app_commit": "62205c1f360f4de49191d2e06348e4031cd168b9",
     "app_version": "0.46.0",
     "caller_origin": "help",
     "session_origin": "help",
@@ -29,7 +29,7 @@
     "captured_at": "2026-10-25",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "909aebe44ecc0ce916cec3fa83a59854d8b362265ec469c3cd9e4b6f4c4a8969",
+    "surface_hash": "357a8bb543b0e0186db9f444e7839ccdbb30ebc6cce460cb9e6fb16d8d58cfc7",
     "surface_hash_method": "structuredContent.hash of a real tools/call mcp.surface on the same session (equal to buildSurfaceManifest over the same manifest and session policy)",
     "tool_count": 46,
     "context_gated_tools": [],
@@ -1941,7 +1941,7 @@
     {
       "action_id": "host.list",
       "wire_name": "host.list",
-      "description": "List the hosts this assistant reaches, this machine first as local, as observed: connection, load sample, agent counts and each connected host's projects, which calls name. Null means unmeasured.",
+      "description": "List the hosts this assistant reaches, this machine first as local, as observed: link flags, build, installed CLIs, load sample, agent counts and a page of each connected host's projects, which calls name. Null means unmeasured.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -1951,6 +1951,18 @@
           },
           "projectId": {
             "description": "With includeAgents, list only the agents of this project (a projectId from the list).",
+            "type": "string"
+          },
+          "hostId": {
+            "description": "List only this host.",
+            "type": "string"
+          },
+          "projectQuery": {
+            "description": "Only projects whose name contains this, any case.",
+            "type": "string"
+          },
+          "projectCursor": {
+            "description": "A projectInventory.nextCursor: that host's next page, same query.",
             "type": "string"
           }
         },
@@ -1978,6 +1990,213 @@
                     "connecting",
                     "disconnected"
                   ]
+                },
+                "link": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "disconnected",
+                        "connecting",
+                        "connected",
+                        "unreachable",
+                        "version-mismatch",
+                        "driven-elsewhere"
+                      ]
+                    },
+                    "attempt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "restarting": {
+                      "type": "boolean",
+                      "description": "It said it was shutting down; still retried."
+                    },
+                    "hostModeOff": {
+                      "type": "boolean",
+                      "description": "ssh got in; no Daintree in Host mode there."
+                    },
+                    "stoppedRetrying": {
+                      "description": "Waits for a Connect: login refused, Host mode off or unusable.",
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "disconnectedByPerson": {
+                      "type": "boolean"
+                    },
+                    "quietSince": {
+                      "description": "Connected; silent since.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "mismatch": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "protocol",
+                                "version",
+                                "commit"
+                              ]
+                            },
+                            "local": {
+                              "type": "string"
+                            },
+                            "remote": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "local",
+                            "remote"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Builds differ; blocking only under version-mismatch."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "attempt",
+                    "restarting",
+                    "hostModeOff",
+                    "stoppedRetrying",
+                    "disconnectedByPerson",
+                    "quietSince",
+                    "mismatch"
+                  ],
+                  "additionalProperties": false
+                },
+                "build": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "connected",
+                        "rejected",
+                        "last-seen",
+                        "unknown"
+                      ]
+                    },
+                    "handshake": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "string"
+                            },
+                            "commit": {
+                              "type": "string"
+                            },
+                            "protocolVersion": {
+                              "type": "number"
+                            },
+                            "platform": {
+                              "type": "string",
+                              "enum": [
+                                "darwin",
+                                "linux"
+                              ]
+                            },
+                            "arch": {
+                              "type": "string",
+                              "enum": [
+                                "x64",
+                                "arm64"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "commit",
+                            "protocolVersion",
+                            "platform",
+                            "arch"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "handshake"
+                  ],
+                  "additionalProperties": false
+                },
+                "agentClis": {
+                  "type": "object",
+                  "properties": {
+                    "coverage": {
+                      "type": "string",
+                      "enum": [
+                        "observed",
+                        "stale",
+                        "unknown"
+                      ]
+                    },
+                    "sampledAt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "installed": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "agentId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "agentId",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "omitted": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "coverage",
+                    "sampledAt",
+                    "installed",
+                    "omitted"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Installed only: sign-in and quota unknown. Absence unproven."
                 },
                 "rttMs": {
                   "type": [
@@ -2204,6 +2423,59 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "projectInventory": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "complete": {
+                          "type": "boolean",
+                          "description": "This answer names every match. With a total, pages walked to a null nextCursor name them all."
+                        },
+                        "total": {
+                          "description": "Null: past the host's own list limit.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "offset": {
+                          "type": "number"
+                        },
+                        "omitted": {
+                          "description": "Matching projects not named here, earlier pages too.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "nextCursor": {
+                          "description": "projectCursor for the next page.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "listChanged": {
+                          "type": "boolean",
+                          "description": "The list changed since the cursor: its first page again."
+                        }
+                      },
+                      "required": [
+                        "complete",
+                        "total",
+                        "offset",
+                        "omitted",
+                        "nextCursor",
+                        "listChanged"
+                      ],
+                      "additionalProperties": false
                     },
                     {
                       "type": "null"
@@ -2576,11 +2848,15 @@
                 "hostId",
                 "name",
                 "connection",
+                "link",
+                "build",
+                "agentClis",
                 "rttMs",
                 "lastSeenAt",
                 "load",
                 "agentsObserved",
                 "projects",
+                "projectInventory",
                 "control"
               ],
               "additionalProperties": false
