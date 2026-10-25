@@ -197,8 +197,10 @@ stamp keep unknown corpus provenance; do not fill it with today's corpus hash.
 | `calibrate_floors.py` | re-derives the admission floors against a fresh export |
 | `try_runbook_text.py` | scores a proposed whenToUse/summary edit — no retrain, no writes |
 | `eval_zero_shot.py` | what a retrain actually bought, vs a both-stages holdout |
+| `loss_inventory.py` | a `bench local` run's losses split by case shape (search-shaped vs historical) and trained/untrained |
 | `common.py` | wraps the SERVING renderer for training rows |
 | `EXPERIMENTS.md` | **the log — read first** |
+| `REFRESH-2026-10-25.md` | the next retrain, prepared: baseline, losses, signoff, protocol, prerequisites |
 
 The abandoned pipelines (bi-encoder + **cross-encoder** reranker; hosted
 embeddings) and the single fixed-head classifier that shipped before this one

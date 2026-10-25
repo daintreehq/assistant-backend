@@ -201,6 +201,9 @@ boundaries:
   - query: Give every Remote Host the same task to implement the health-check endpoint on its own branch and return a host-by-host result table.
     confusable_with: [daintree.hosts.coordinate-dev-services]
     run: 2026-10-16-synthetic-audit
+  - query: "on every host, pull develop and then have an agent there run the full test suite and fix what fails"
+    confusable_with: [daintree.hosts.sync-with-origin]
+    run: 2026-10-25-selector-refresh
 
 followups:
   - query: actually, have every other host do the same one too, each on its own branch

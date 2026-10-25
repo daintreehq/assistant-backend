@@ -458,6 +458,9 @@ boundaries:
   - query: "read me codex's remaining five hour window before I decide anything"
     confusable_with: [daintree.agents.choose-agent-model]
     run: runbook-2026-10-19-choose-agent-model
+  - query: "before I queue anything else, what share of the codex plan have I burned this week and when does the window roll over"
+    confusable_with: [daintree.agents.resume-after-usage-limit]
+    run: 2026-10-25-selector-refresh
 followups:
   - query: now do grok
     history:

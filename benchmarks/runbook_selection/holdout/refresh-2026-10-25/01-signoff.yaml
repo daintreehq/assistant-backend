@@ -1,0 +1,678 @@
+cases:
+# --- Group 1: local versus remote continuation (10) ---
+- id: refresh-signoff-local-resume-hosts-connected
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Morning. Before I look at the other machines at all, what was I in the middle of in this project yesterday? Which agents here were still going when I stopped?
+  expect:
+    required:
+    - daintree.orchestration.status-and-resume
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.recover-and-clean-up
+  note: 'Deciding clause: "where were we, what was I working on" (daintree.orchestration.status-and-resume); recover-and-clean-up excludes "catching up on local work".'
+- id: refresh-signoff-remote-overnight-catchup
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user handed the search-index rewrite to studio-2 and two bug fixes to the build box last night. They want to know which of those finished, which are still going and whether any need sending again.
+  expect:
+    required:
+    - daintree.hosts.recover-and-clean-up
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.orchestration.status-and-resume
+  note: 'Deciding clause: "where things stand with the work handed to another machine" (daintree.hosts.recover-and-clean-up); status-and-resume excludes "work sent to assistants on other machines".'
+- id: refresh-signoff-local-several-projects-catchup
+  category: continuation
+  host_state: {hosts: none}
+  messages:
+  - role: user
+    content: I bounced between the api, web-client and docs-site projects all afternoon and lost track. Catch me up on what is still open in each.
+  expect:
+    required:
+    - daintree.orchestration.status-and-resume
+    optional:
+    - daintree.foundation
+  note: 'Deciding clause: "catch me up, what is still open or in flight" (daintree.orchestration.status-and-resume).'
+- id: refresh-signoff-remote-after-restart
+  category: continuation
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Daintree crashed and came back. I had work running on my linux machine through its assistant. Is any of it still alive, and did anything get lost?
+  expect:
+    required:
+    - daintree.hosts.recover-and-clean-up
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.orchestration.status-and-resume
+  note: 'Deciding clause: "usually after Daintree restarted ... which delegated pieces finished, which are still running" (daintree.hosts.recover-and-clean-up).'
+- id: refresh-signoff-local-after-reboot
+  category: continuation
+  messages:
+  - role: user
+    content: The user's laptop rebooted for an OS update overnight. They want to know what they were doing in the payments repo before that and pick it back up.
+  expect:
+    required:
+    - daintree.orchestration.status-and-resume
+    optional:
+    - daintree.foundation
+  note: 'Deciding clause: "to pick up / resume something from an earlier session" (daintree.orchestration.status-and-resume).'
+- id: refresh-signoff-local-usage-limit-same-agents
+  category: routing-trap
+  host_state: {hosts: none}
+  messages:
+  - role: user
+    content: All four Claude panes in this window stopped with the usage cap message, resets at 6pm. Once it clears, get each of them carrying on with what it was doing.
+  expect:
+    required:
+    - daintree.agents.resume-after-usage-limit
+    optional:
+    - daintree.foundation
+    forbid:
+    - daintree.agents.hand-off-task
+  note: 'Deciding clause: "carry on in the SAME agents once the limit resets" (daintree.agents.resume-after-usage-limit); it excludes a DIFFERENT agent finishing now (daintree.agents.hand-off-task).'
+- id: refresh-signoff-usage-limit-switch-agent-now
+  category: routing-trap
+  messages:
+  - role: user
+    content: Claude ran dry halfway through the cache refactor and I can't wait hours for the reset. Have Codex pick it up right now in the same worktree.
+  expect:
+    required:
+    - daintree.agents.hand-off-task
+    optional:
+    - daintree.foundation
+    forbid:
+    - daintree.agents.resume-after-usage-limit
+  note: 'Deciding clause: "a task an agent has STARTED must be finished by a DIFFERENT agent ... in the same checkout" (daintree.agents.hand-off-task); resume-after-usage-limit excludes a different CLI finishing now.'
+- id: refresh-signoff-resume-parked-remote-run
+  category: continuation
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: On Friday you put the cross-machine logging migration on hold and wrote a record of where each host was. It's Monday. Get it moving again on the hosts without anyone redoing a unit.
+  expect:
+    required:
+    - daintree.hosts.park-swarm
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.orchestration.status-and-resume
+  note: 'Deciding clause: "later the run resumed from that record and each host''s live terminals" (daintree.hosts.park-swarm); status-and-resume excludes work sent to other machines.'
+- id: refresh-signoff-resume-parked-local-work
+  category: continuation
+  host_state: {hosts: none}
+  messages:
+  - role: user
+    content: The user paused the agents in the billing worktree before a holiday and left resume notes. They are back and want that work picked up again.
+  expect:
+    required:
+    - daintree.orchestration.status-and-resume
+    optional:
+    - daintree.foundation
+    forbid:
+    - daintree.orchestration.park-work
+  note: 'Deciding clause: park-work says "to pick parked work back up (use daintree.orchestration.status-and-resume)".'
+- id: refresh-signoff-remote-task-never-returned
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: I asked the assistant on the mini to bump the SDK and open a PR three hours ago. Nothing came back. What happened to it?
+  expect:
+    required:
+    - daintree.hosts.recover-and-clean-up
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.agents.recover-agent
+  note: 'Deciding clause: recover-agent says "for a task delegated to another machine''s assistant that never came back use daintree.hosts.recover-and-clean-up".'
+# --- Group 2: one host versus several hosts (10) ---
+- id: refresh-signoff-one-unit-one-host
+  category: single-runbook
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Get studio-2 to sort out the flaky upload test in the media-service repo and put up a PR. Tell me the branch when it's done.
+  expect:
+    required:
+    - daintree.hosts.delegate-to-host
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: 'Deciding clause: "ONE piece of WORK done on another machine" (daintree.hosts.delegate-to-host).'
+- id: refresh-signoff-same-work-every-host
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user wants each of their three machines to attempt the bundler upgrade independently, each on its own branch, then a table of what every machine ended up with.
+  expect:
+    required:
+    - daintree.hosts.swarm-fan-out
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.delegate-to-host
+  note: 'Deciding clause: "SAME WORK done on EVERY Remote Host ... one copy per machine" (daintree.hosts.swarm-fan-out); delegate-to-host excludes "the same work on several hosts at once".'
+- id: refresh-signoff-different-units-over-hosts
+  category: single-runbook
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Six unrelated bugs are tagged for this sprint. Spread them over my machines according to which ones have spare capacity and the right agents signed in. Show me the plan first.
+  expect:
+    required:
+    - daintree.hosts.place-work
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.swarm-fan-out
+  note: 'Deciding clause: "DIFFERENT, independent pieces of work ... put on whichever Remote Host ... can best take it" (daintree.hosts.place-work); swarm-fan-out says a list of different pieces is place-work.'
+- id: refresh-signoff-question-to-host-assistant
+  category: host-query
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Ask the assistant on the build box whether the overnight data backfill finished cleanly. Just its answer, don't have it touch anything.
+  expect:
+    required:
+    - daintree.hosts.ask-host-assistant
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.delegate-to-host
+  note: 'Deciding clause: "ONE QUESTION answered by the Daintree assistant on ANOTHER MACHINE" (daintree.hosts.ask-host-assistant); delegate-to-host excludes a question "whose deliverable is its answer".'
+- id: refresh-signoff-staged-plan-over-hosts
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user has a plan across their hosts. First the shared schema package, then the billing service and the mobile client both built on it, then the changelog once both apps land. Each piece belongs on whichever machine owns that repo. Run it through to the end.
+  expect:
+    required:
+    - daintree.hosts.execute-distributed-workflow
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.delegate-to-host
+  note: 'Deciding clause: "a dependency graph of three or more units in which several wait on others" (daintree.hosts.execute-distributed-workflow); delegate-to-host excludes "a staged plan of several dependent units".'
+- id: refresh-signoff-two-host-handover
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Once the linux box has pushed the new auth endpoint, have studio-2 build the frontend login form against it.
+  expect:
+    required:
+    - daintree.hosts.delegate-to-host
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.execute-distributed-workflow
+  note: 'Deciding clause: "a second host starting once the first host''s change lands" (daintree.hosts.delegate-to-host); execute-distributed-workflow excludes "one hand-over between two hosts".'
+- id: refresh-signoff-batch-for-one-named-host
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user wants these five issues all worked on the build box, one agent and worktree per issue, nothing on the other machines.
+  expect:
+    required:
+    - daintree.orchestration.fan-out-work
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.place-work
+  note: 'Deciding clause: place-work excludes "several issues all for ONE machine the person named ... daintree.orchestration.fan-out-work ... driven there".'
+- id: refresh-signoff-one-piece-no-host-chosen
+  category: single-runbook
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: I've got a ticket to add rate limiting to the public API. Which of my machines is best placed to take it right now? Send it there.
+  expect:
+    required:
+    - daintree.hosts.place-work
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: 'Deciding clause: "or one piece with no machine chosen ... which machine should take this" (daintree.hosts.place-work).'
+- id: refresh-signoff-race-two-hosts
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Let studio-1 and studio-2 each have a go at the image pipeline rewrite, then get an agent that wrote neither to judge which attempt is better without knowing whose is whose.
+  expect:
+    required:
+    - daintree.hosts.race-and-review
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.swarm-fan-out
+  note: 'Deciding clause: "work on Remote Hosts should be JUDGED by a machine or agent that did not build it" (daintree.hosts.race-and-review); it excludes "the same work on every host with no judging (daintree.hosts.swarm-fan-out)".'
+- id: refresh-signoff-ready-host-assistants
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user wants Codex up and running as the assistant on both studios so it's ready for later. No work goes out yet.
+  expect:
+    required:
+    - daintree.hosts.delegate-to-host
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.swarm-fan-out
+  note: 'Deciding clause: "when the person only wants Claude Code or Codex READY as a host''s assistant" (daintree.hosts.delegate-to-host); swarm-fan-out excludes "readying an assistant on each host with no work sent".'
+# --- Group 3: held and draining work (8) ---
+- id: refresh-signoff-drain-hold-new-starts
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: We're partway through the backlog run over studio-1 and studio-2. Stop giving the hosts new issues, but let the agents already on one finish and get merged.
+  expect:
+    required:
+    - daintree.hosts.drain-issue-backlog
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: 'Deciding clause: asked mid-run "stop starting new work but let the running ones finish" (daintree.hosts.drain-issue-backlog).'
+- id: refresh-signoff-park-remote-run
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user is going away for a long weekend. Their cross-machine run should be held until Tuesday with every worktree kept and a note of where each host is, so it can be picked up later.
+  expect:
+    required:
+    - daintree.hosts.park-swarm
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.orchestration.park-work
+  note: 'Deciding clause: "a run ALREADY SENT to their Remote Hosts must be PUT ON HOLD TO COME BACK TO" (daintree.hosts.park-swarm); it excludes "agents on this machine (daintree.orchestration.park-work)".'
+- id: refresh-signoff-park-local-agents
+  category: single-runbook
+  host_state: {hosts: none}
+  messages:
+  - role: user
+    content: Calling it a night. Bring the agents in this project to a safe stop, tell me what's uncommitted in each, and leave notes for tomorrow. Don't close any panes.
+  expect:
+    required:
+    - daintree.orchestration.park-work
+    optional:
+    - daintree.foundation
+  note: 'Deciding clause: "in-flight work paused and made safe, not torn down" (daintree.orchestration.park-work).'
+- id: refresh-signoff-reprioritize-remote
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: A security patch has to go out today. Clear the build box and studio-2 of their lower-priority remote tasks so they can work on it, and keep the schema migration going on the third machine.
+  expect:
+    required:
+    - daintree.hosts.reprioritize-swarm
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.orchestration.reprioritize-work
+  note: 'Deciding clause: "something URGENT arrives while their Remote Hosts are busy ... JUMP THE QUEUE across those machines" (daintree.hosts.reprioritize-swarm); it excludes "agents on this machine (daintree.orchestration.reprioritize-work)".'
+- id: refresh-signoff-reprioritize-local
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user says signup is broken for new customers. Pause the agents here doing docs and lint cleanup, put two of them on the signup bug in a fresh worktree, and leave the payments refactor running.
+  expect:
+    required:
+    - daintree.orchestration.reprioritize-work
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.reprioritize-swarm
+  note: 'Deciding clause: "something became URGENT while agents are already busy ... each one kept, paused ... or redirected" (daintree.orchestration.reprioritize-work); reprioritize-swarm excludes agents on this machine.'
+- id: refresh-signoff-host-maintenance
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: I'm going to update Daintree on the linux box tonight. What will that interrupt over there, and make sure whatever is running gets to a checkpoint first.
+  expect:
+    required:
+    - daintree.hosts.prepare-host-maintenance
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.park-swarm
+  note: 'Deciding clause: "BEFORE the person updates, restarts or reboots Daintree on a Remote Host" (daintree.hosts.prepare-host-maintenance); park-swarm excludes "readying a host for its own planned restart".'
+- id: refresh-signoff-steer-remote-run
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The work I sent out to my machines this morning is branching from the wrong base. Tell every agent in that run to rebase onto release/2.4 instead; everything else in the brief stays.
+  expect:
+    required:
+    - daintree.hosts.steer-swarm
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.agents.steer-running-agent
+  note: 'Deciding clause: "work they ALREADY SENT to their other machines ... CHANGED while it is under way" (daintree.hosts.steer-swarm); it excludes "agents on this machine (daintree.agents.steer-running-agent)".'
+- id: refresh-signoff-drain-backlog-over-hosts
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user wants every issue labelled ready worked off using studio-1 and studio-2, at most four agents on each, with this Mac choosing the next issue and doing the merges until the label is empty.
+  expect:
+    required:
+    - daintree.hosts.drain-issue-backlog
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.place-work
+  note: 'Deciding clause: "an issue BACKLOG ... across SEVERAL machines ... while this machine ... picks the issues and merges" (daintree.hosts.drain-issue-backlog); place-work excludes issues "worked through in successive batches ... with picks and merges between".'
+# --- Group 4: newly added host and agent capabilities (14) ---
+- id: refresh-signoff-configure-canopy-two-hosts
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Switch Canopy off on studio-1 and the build box, nowhere else, and tell me which ones actually took the change.
+  expect:
+    required:
+    - daintree.hosts.configure-settings
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.copy-portable-settings
+  note: 'Deciding clause: "turn Canopy on, off or hidden on all their hosts or the ones named" (daintree.hosts.configure-settings); copy-portable-settings excludes "one named setting read or changed by key on hosts, Canopy among them".'
+- id: refresh-signoff-configure-read-default-agent
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user wants to know which agent each of their Remote Hosts launches by default at the moment. Read only, change nothing.
+  expect:
+    required:
+    - daintree.hosts.configure-settings
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.survey-hosts
+  note: 'Deciding clause: "which agent a host starts by default ... a read that writes nothing" (daintree.hosts.configure-settings); survey-hosts excludes "a named setting read or changed on hosts".'
+- id: refresh-signoff-prepare-project-no-window
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: studio-2 doesn't have this checkout yet. Get the repo onto it without opening a window there, then start Codex on the export-csv branch.
+  expect:
+    required:
+    - daintree.hosts.prepare-project-for-work
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.open-project-on-host
+    - daintree.hosts.delegate-to-host
+  note: 'Deciding clause: "THIS project ... made present on a connected Remote Host so work can run there, done by you with no dialog or window" (daintree.hosts.prepare-project-for-work); delegate-to-host excludes "a host lacking the project".'
+- id: refresh-signoff-prepare-project-skip-dialog
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user wants this project available on the build machine so agents can run there later. They explicitly don't want the open-project dialog or anything pushed.
+  expect:
+    required:
+    - daintree.hosts.prepare-project-for-work
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.open-project-on-host
+  note: 'Deciding clause: open-project-on-host excludes "the project only made present on a connected host for work ... with no window or dialog (daintree.hosts.prepare-project-for-work)".'
+- id: refresh-signoff-drain-eta
+  category: single-runbook
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: We're working the issue backlog off on my two studios with merges here. At the rate they're going, roughly when will the queue be empty?
+  expect:
+    required:
+    - daintree.hosts.drain-issue-backlog
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: 'Deciding clause: asked mid-run "how long will the drain take at this rate" (daintree.hosts.drain-issue-backlog).'
+- id: refresh-signoff-drain-move-merges
+  category: single-runbook
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: In the backlog run across the hosts, hand the merging over to the build box from now on; this Mac should only pick the next issues.
+  expect:
+    required:
+    - daintree.hosts.drain-issue-backlog
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+  note: 'Deciding clause: "while this machine (or one host they name) picks the issues and merges" (daintree.hosts.drain-issue-backlog).'
+- id: refresh-signoff-answer-assistants-everywhere
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user wants all their Daintree Assistants checked, in this project, their other repos here and on both studios. Answer whatever the agreed rollout plan already settles, and bring the remaining questions to them in one message.
+  expect:
+    required:
+    - daintree.hosts.answer-assistant-questions
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.agents.answer-waiting-agent
+  note: 'Deciding clause: "which assistants need them across projects and machines ... bringing every other question ... in one batch" (daintree.hosts.answer-assistant-questions); answer-waiting-agent excludes "Daintree Assistants'' own questions across projects and hosts".'
+- id: refresh-signoff-answer-assistants-not-survey
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Is anything on my machines waiting for me? Any Daintree assistant stuck on a question the migration plan already answers, just answer it for me.
+  expect:
+    required:
+    - daintree.hosts.answer-assistant-questions
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.survey-hosts
+  note: 'Deciding clause: "answering the questions the person''s earlier instructions or agreed plan already cover" (daintree.hosts.answer-assistant-questions); it excludes "a read-only report of the hosts that answers nothing (daintree.hosts.survey-hosts)".'
+- id: refresh-signoff-sync-hosts-base-checkout
+  category: single-runbook
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Check whether the main checkout of the monorepo on studio-1 and the linux box lags origin, and catch each one up. No stashing or resets; if one can't fast-forward, leave it and tell me why.
+  expect:
+    required:
+    - daintree.hosts.sync-with-origin
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.git.sync-with-base
+  note: 'Deciding clause: "a repository''s checkout on their other machines brought UP TO DATE with origin" (daintree.hosts.sync-with-origin); it excludes "a feature branch or worktree up to date with its base (daintree.git.sync-with-base)".'
+- id: refresh-signoff-sync-not-fan-out
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user wants all three of their machines to update their payments repo checkout to whatever origin main has now, and report the SHA each one ends up on.
+  expect:
+    required:
+    - daintree.hosts.sync-with-origin
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.swarm-fan-out
+  note: 'Deciding clause: sync-with-origin reports "per machine, whether its base checkout now matches origin''s" and excludes "the same coding work on every host (daintree.hosts.swarm-fan-out)".'
+- id: refresh-signoff-choose-model-per-issue
+  category: single-runbook
+  host_state: {hosts: none}
+  messages:
+  - role: user
+    content: Before I launch anything for these eight issues, tell me which ones a cheap quick model can handle and which need the strongest model at high effort, and why.
+  expect:
+    required:
+    - daintree.agents.choose-agent-model
+    optional:
+    - daintree.foundation
+    - daintree.orchestration.fan-out-work
+  note: 'Deciding clause: "the CHOICE of agent CLI, model or reasoning effort ... reported as a recommendation" (daintree.agents.choose-agent-model).'
+- id: refresh-signoff-choose-model-on-named-host
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The database migration is going to studio-2 either way. Should Codex or Claude do it there, and at what effort? Keep the cost down if quality won't suffer.
+  expect:
+    required:
+    - daintree.agents.choose-agent-model
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    - daintree.hosts.delegate-to-host
+    forbid:
+    - daintree.hosts.place-work
+  note: 'Deciding clause: "should Codex or Claude take this ... on this machine or a Remote Host" (daintree.agents.choose-agent-model); place-work excludes "only which model each issue gets ... once the hosts are chosen".'
+- id: refresh-signoff-resume-limit-on-host
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: The user says every Claude agent on studio-1 stopped at the five-hour cap, resetting at 15:40. They want those same sessions continued after it clears, without buying extra usage or moving the work anywhere.
+  expect:
+    required:
+    - daintree.agents.resume-after-usage-limit
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.rebalance-load
+    - daintree.agents.hand-off-task
+  note: 'Deciding clause: "continue each stopped agent in its own conversation ... here or on a Remote Host" (daintree.agents.resume-after-usage-limit); it excludes moving work off a host (daintree.hosts.rebalance-load) and a different agent (daintree.agents.hand-off-task).'
+- id: refresh-signoff-resume-limit-not-usage-read
+  category: routing-trap
+  messages:
+  - role: user
+    content: The agents in this window all died with a limit-reached banner. Note when each account frees up, start nothing new on them in the meantime, and nudge each one to keep going afterwards.
+  expect:
+    required:
+    - daintree.agents.resume-after-usage-limit
+    optional:
+    - daintree.foundation
+    forbid:
+    - daintree.agents.check-usage-limits
+  note: 'Deciding clause: "record each account''s reset time, start nothing more on that account" (daintree.agents.resume-after-usage-limit); it excludes "to read how much allowance is left (daintree.agents.check-usage-limits)".'
+# --- Group 5: controls (6) ---
+- id: refresh-signoff-control-local-fix
+  category: single-runbook
+  host_state: {hosts: none}
+  messages:
+  - role: user
+    content: The CSV importer chokes on files that start with a byte-order mark. Get an agent to fix it in this repo.
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+  note: 'Deciding clause: "any request to CHANGE project code or files that no more specific workflow owns" (daintree.edits.spawn-visible-agent).'
+- id: refresh-signoff-control-local-with-hosts
+  category: routing-trap
+  host_state: {hosts: connected}
+  messages:
+  - role: user
+    content: Rename the fetchUser helper to loadUser across this project and fix the call sites. Do it here on this Mac, not on the other machines.
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+    - daintree.hosts.foundation
+    forbid:
+    - daintree.hosts.delegate-to-host
+  note: 'Deciding clause: delegate-to-host excludes "work by an agent on THIS machine (daintree.edits.spawn-visible-agent)".'
+- id: refresh-signoff-control-named-model
+  category: routing-trap
+  messages:
+  - role: user
+    content: The user wants the settings screen to remember the last tab that was open. They asked for Codex on gpt-5 at high effort to do it.
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+    forbid:
+    - daintree.agents.choose-agent-model
+  note: 'Deciding clause: choose-agent-model excludes "the user having named the agent and any model or effort (daintree.edits.spawn-visible-agent)".'
+- id: refresh-signoff-control-plain-feature
+  category: single-runbook
+  messages:
+  - role: user
+    content: The user wants a dark mode toggle in the dashboard header that persists across reloads.
+  expect:
+    required:
+    - daintree.edits.spawn-visible-agent
+    optional:
+    - daintree.foundation
+  note: 'Deciding clause: "any request to CHANGE project code or files ... The work goes to ONE visible agent" (daintree.edits.spawn-visible-agent).'
+- id: refresh-signoff-control-sign-off
+  category: no-task
+  messages:
+  - role: user
+    content: Great, thanks. That's all for today.
+  expect:
+    required: []
+  note: 'No task: nothing to change, read or orchestrate; daintree.foundation is loaded "ALONE only when no runbook squarely matches" a Daintree request, and this is none.'
+- id: refresh-signoff-control-docs-question
+  category: no-task
+  messages:
+  - role: user
+    content: How do I make the terminal font bigger in Daintree?
+  expect:
+    required: []
+  note: 'Deciding clause: "to ask about DAINTREE itself rather than the project (a documentation question — no runbook needed" (daintree.explore.repository).'

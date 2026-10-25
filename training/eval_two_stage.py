@@ -115,6 +115,14 @@ def main() -> int:
             + "  ".join(f"{name}={stages[name]}" for name in STAGES if stages[name])
             + (f"  candidate_miss={stages['candidate_miss']}" if not any(stages.values()) else "")
         )
+        forbidden = [
+            f"{cid}: {', '.join(ids)}"
+            for cid, ids in zip(doc["case_ids"], doc["forbidden"], strict=True)
+            if ids
+        ]
+        print(f"     forbidden loads: {len(forbidden)}")
+        for line in forbidden:
+            print(f"       {line}")
 
     diffs = [
         (c.id, a, b)

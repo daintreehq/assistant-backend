@@ -87,6 +87,12 @@ boundaries:
       - daintree.git.resolve-semantic-conflict
       - daintree.workflow.prep-branch-for-review
     run: 2026-10-16-synthetic-audit
+  - query: "rebase my feature worktree on the latest origin main"
+    confusable_with: [daintree.hosts.sync-with-origin]
+    run: 2026-10-25-selector-refresh
+  - query: "this branch's worktree is behind develop, bring it up to date"
+    confusable_with: [daintree.hosts.sync-with-origin]
+    run: 2026-10-25-selector-refresh
 followups:
   - query: ok push it — with the lease like you said
     history:

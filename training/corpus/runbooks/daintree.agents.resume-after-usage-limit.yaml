@@ -17,6 +17,30 @@ positives:
   - "the remote host's Claude account is out until 3:10, hold off and then continue every agent it stopped"
   - "several panes say usage limit reached; once that's over get them all moving again in their own sessions"
   - "after the reset, check which agents came back by themselves and continue the rest"
+  - query: "The user's Claude agents stopped with 'usage limit reached'; note the reset time and continue each in its own conversation after it."
+    run: 2026-10-25-selector-refresh
+  - query: "every pane on the studio says the limit resets at 6pm. carry them on then"
+    run: 2026-10-25-selector-refresh
+  - query: "codex ran out of quota halfway through three tasks, keep the same sessions and resume them after the window resets"
+    run: 2026-10-25-selector-refresh
+  - query: "they're all parked on the allowance message. don't spin up new ones, just continue them when it lifts"
+    run: 2026-10-25-selector-refresh
+  - query: "my agents stopped on the plan limit an hour ago, the reset should have passed now, get them back to work"
+    run: 2026-10-25-selector-refresh
+  - query: "Task: agents halted on the account's usage cap. Start nothing else on that account; after the reset send each one a single continue and confirm it is working."
+    run: 2026-10-25-selector-refresh
+  - query: "the overnight run died on the 5-hour cap, pick every stopped agent back up after it resets at 1am"
+    run: 2026-10-25-selector-refresh
+  - query: "hit the session limit on both remote machines; when it resets continue the agents there"
+    run: 2026-10-25-selector-refresh
+  - query: "the limit reset was at 9. which stopped agents are still idle, and continue those"
+    run: 2026-10-25-selector-refresh
+  - query: "out of usage until 4:30, then let each agent finish what it was doing"
+    run: 2026-10-25-selector-refresh
+  - query: "Claude says I've reached my limit on all four panes; resume them in place after the reset, no extra usage purchase"
+    run: 2026-10-25-selector-refresh
+  - query: "the agents that stopped on the usage cap: wait it out, then have each one continue its own task"
+    run: 2026-10-25-selector-refresh
 boundaries:
   - query: "my agents hit the usage limit; just continue them later, no need to switch to another agent"
     confusable_with: [daintree.agents.hand-off-task]

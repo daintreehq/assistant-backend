@@ -18,6 +18,34 @@ positives:
   - "make the servers pull the newest main, but don't reset or stash anything on them"
   - "one of my hosts keeps branching from an old develop; catch all of them up with origin"
   - "bring this machine and both hosts level with origin develop"
+  - query: "The user wants the base checkout on each connected Remote Host fetched and fast-forwarded to origin/main, with a per-host report of branch and SHA."
+    run: 2026-10-25-selector-refresh
+  - query: "is the tower still on last week's develop? catch it up with origin if it can fast-forward"
+    run: 2026-10-25-selector-refresh
+  - query: "before I hand out the next round, every remote machine's repo needs to be at origin develop"
+    run: 2026-10-25-selector-refresh
+  - query: "check whether the two linux boxes are behind the remote and pull them forward without touching anything local"
+    run: 2026-10-25-selector-refresh
+  - query: "Bring the hosts' copies of this repository level with origin's default branch; hold any host that has uncommitted changes on it."
+    run: 2026-10-25-selector-refresh
+  - query: "the mini and the studio both need the newest main from github, fast-forward only please"
+    run: 2026-10-25-selector-refresh
+  - query: "Task: for each named host, fetch origin and fast-forward the base branch, then report which hosts could not and why."
+    run: 2026-10-25-selector-refresh
+  - query: "my remote machines are a few commits behind; get their main checkouts current"
+    run: 2026-10-25-selector-refresh
+  - query: "update the repo on gpu-box and the spare mac to origin/develop, don't stash or reset"
+    run: 2026-10-25-selector-refresh
+  - query: "are any of my hosts out of date with origin? fix the ones that can just fast-forward"
+    run: 2026-10-25-selector-refresh
+  - query: "pull the latest base onto every machine that'll take work today, this one included"
+    run: 2026-10-25-selector-refresh
+  - query: "The user asked that each Remote Host's base branch match origin before new agents start there; refresh them and list each host's SHA."
+    run: 2026-10-25-selector-refresh
+  - query: "studio-3 diverged last time; fetch on all hosts, fast-forward where possible and tell me which ones are stuck"
+    run: 2026-10-25-selector-refresh
+  - query: "get origin main onto the build machines, nothing else changed on them"
+    run: 2026-10-25-selector-refresh
 boundaries:
   - query: "have both remote machines pull develop so the next issues start from it"
     confusable_with: [daintree.hosts.delegate-to-host]
