@@ -165,6 +165,30 @@ cannot improve something else at this one's expense.
 
 ---
 
+## Retrain so the host procedures stop taking single-host and model-split turns
+
+**Trigger: the next retrain (`/retrain-selector daintree.hosts.drain-issue-backlog
+daintree.hosts.place-work daintree.agents.choose-agent-model`).**
+
+`bench local` now fails on any forbidden load (#186), and three cases trip it on the
+shipped model (98728e4c, trained 2026-10-18), which predates both host runbooks
+involved (place-work 2026-10-21, drain-issue-backlog 2026-10-23):
+
+- `tx-host-batch-rounds-agent-query` and `tx-host-all-issues-user-words`: one named
+  host, so `orchestration.work-in-waves` / `orchestration.fan-out-work`; the head
+  admits `hosts.drain-issue-backlog` at 0.99+.
+- `tx-model-split-across-named-hosts`: hosts already chosen, so
+  `agents.choose-agent-model`; `hosts.place-work` is admitted at 0.998 and the
+  required runbook ranks 4th at 0.0017.
+
+Routing text does not move them. On 2026-10-25, three drain-issue-backlog variants
+(the single-host fence reworded, the fence dropped, the lead rewritten to "split
+between two or more hosts, never just one") each scored net 0 over all 1,850 cases
+and left all three cases where they were. The corpus already carries the right
+rows; the model has never seen them. These are the cases the retrain must win back.
+
+---
+
 ## Gate routing traps per EDGE, not per runbook
 
 **Trigger: when the catalog passes ~75 runbooks, or sooner if a confusion pair
