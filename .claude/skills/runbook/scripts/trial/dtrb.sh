@@ -7,6 +7,7 @@
 #   dtrb.sh up [--hosts N] [run-name]   seed a scratch project and hold an isolated Daintree open;
 #         --hosts 1-3: also N isolated Remote Hosts (Host mode, private sshd on 127.0.0.1),
 #         each with a clone of the scratch repo at the same base commit, added to the Shell
+#         (DTRB_HOST_WITHOUT_PROJECT=N: host N opens an unrelated repo instead)
 #   dtrb.sh trial [opts] "prompt"  launch one agent pane with the prompt; wait; summarise
 #         --agent claude|codex (claude)  --model M (haiku)  --timeout MIN (20)  --id NAME
 #         --flag ARG (repeatable, verbatim CLI flag)  --no-wait  -f PROMPT_FILE
@@ -284,9 +285,18 @@ EOF
 }
 
 # A Remote Host's copy of the scratch project: a clone of the same bare origin, so the
-# Shell and every host start from one base commit, with the same agent config.
+# Shell and every host start from one base commit, with the same agent config. With
+# a third argument, an unrelated repo instead (no origin, nothing shared): a host that
+# does not have the project, for preparing one there (DTRB_HOST_WITHOUT_PROJECT).
 seed_host_project() {
   local src="$1" dir="$2" f
+  if [ -n "${3:-}" ]; then
+    dir="$(dirname "$dir")/notes"
+    mkdir -p "$dir" && git -C "$dir" init --quiet -b main
+    printf '# notes\n\nScratch notes, kept in git.\n' >"$dir/README.md"
+    git -C "$dir" add -A && git -C "$dir" -c user.name=dev -c user.email=dev@example.invalid commit --quiet -m "Start notes"
+    echo "$dir"; return
+  fi
   git clone --quiet -b main "$src/../origin.git" "$dir"
   for f in .mcp.json .claude CLAUDE.local.md; do [ -e "$src/$f" ] && cp -R "$src/$f" "$dir/$f"; done
   printf '.mcp.json\n.claude/\n.daintree/\nCLAUDE.local.md\n' >>"$dir/.git/info/exclude"
@@ -326,7 +336,11 @@ cmd_up() {
   : >"$run/host-projects"
   for i in $(seq 1 "$nhosts"); do
     hproj="$PROJECTS_ROOT/$(openssl rand -hex 2)/tally"
-    seed_host_project "$proj" "$hproj"
+    if [ "${DTRB_HOST_WITHOUT_PROJECT:-}" = "$i" ]; then
+      hproj="$(seed_host_project "$proj" "$hproj" bare)"
+    else
+      seed_host_project "$proj" "$hproj"
+    fi
     echo "$hproj" >>"$run/host-projects"
     hprojs="${hprojs:+$hprojs:}$hproj"
   done
