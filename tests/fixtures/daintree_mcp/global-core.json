@@ -2,7 +2,7 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "1752ef90a46df6152f95a0befde2dca46491e44c",
+    "app_commit": "2c6d1fb3d46061ceb8526a88efdb60f04d6f6f57",
     "app_version": "0.46.0",
     "caller_origin": "global",
     "session_origin": "help",
@@ -26,10 +26,10 @@
       "added_remote_hosts": true,
       "manifest_source": "viewless-help"
     },
-    "captured_at": "2026-10-24",
+    "captured_at": "2026-10-25",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "8ae74d79b928875273986fccf6b645c20e45af2acfc4a841ae7c0a32fc01eda3",
+    "surface_hash": "9a046ac9778f4d990f8c46ee5adf3f413bf239ce53d2b3fafe4ef8f20d1d7288",
     "surface_hash_method": "buildSurfaceManifest(manifest, tier, appVersion, sessionPolicy) — the function the mcp.surface handler calls with the same inputs; the real tools/call was refused in the capture harness: {\"content\":[{\"type\":\"text\",\"text\":\"{\\\"code\\\":\\\"NO_FRONTEND_ATTACHED\\\",\\\"message\\\":\\\"The global assistant has no project of its own, so it reaches projects only through host.call. Nothing was run.\\\",\\\"retriable\\\":true}\"}],\"isError\":true}",
     "tool_count": 0,
     "allowlisted_but_not_listed": [
@@ -162,6 +162,10 @@
         "reason": "not a root tool of the global assistant: it reaches every project through host.call"
       },
       {
+        "action_id": "terminal.restartOnPresetOwned",
+        "reason": "not a root tool of the global assistant: it reaches every project through host.call"
+      },
+      {
         "action_id": "terminal.revealOwned",
         "reason": "not a root tool of the global assistant: it reaches every project through host.call"
       },
@@ -267,6 +271,7 @@
         "terminal.notifyWhenIdle",
         "terminal.placeOwned",
         "terminal.readLastMessageOwned",
+        "terminal.restartOnPresetOwned",
         "terminal.revealOwned",
         "terminal.sendCommandMany",
         "terminal.sendCommandOwned",

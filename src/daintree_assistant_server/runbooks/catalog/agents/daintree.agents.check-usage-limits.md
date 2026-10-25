@@ -19,33 +19,39 @@ optionalTools:
   - host.list
   - host.call
 ---
-The figures exist only in each CLI's own account view; asked in prose, a model guesses. Run the read-only usage command at the agent's own prompt and read the screen. A usage panel is not a turn: no handback, maybe never stopping, so read the screen. A working Claude Code pane's own warning ("You've used 80% of your weekly limit · resets …") is a reading as of when you saw it, quoted with that time; no warning proves nothing. A standing watch ("stop at 90%"): read again before more work goes to that account once the last reading is 20 minutes old.
+Asked, a model guesses: read the agent's own usage screen (no turn; it may never stop). A Claude Code pane's warning ("You've used 80% of your weekly limit · resets …") is a reading as of when seen; none proves nothing. A standing watch ("stop at 90%"): re-read before more work goes to that account once a reading is 20 minutes old.
 
-Known read-only views (September 2026 builds; revalidate each time); a command to avoid never means skipping that CLI.
+Read-only views (September 2026; revalidate); a command to avoid never skips its CLI.
 
-- Claude Code: send `/usage` (aliases `/cost`, `/stats`). Never `/usage-credits` (was `/extra-usage`), which changes billing. Shows % USED per window; an API-key login shows session cost only.
-- Codex: send `/status`. Never `/usage` there: a menu that can REDEEM a banked limit reset. `/status` shows % LEFT for five-hour and weekly limits, resets and credits.
-- Grok: `/usage` (alias `/cost`), Usage limit tab; older builds `/session-info`. Never `/usage manage` (billing). Its weekly bar does not say used or left.
-- Antigravity: `/usage` (alias `/quota`). Avoid `/credits` (purchase link). Shows "Remaining" % per model family.
-- Unchecked: Gemini CLI `/stats model`, Copilot CLI `/usage`, Kimi Code `/usage`.
+- Claude Code: `/usage` (aliases `/cost`, `/stats`). Never `/usage-credits` (was `/extra-usage`): billing. Shows % USED; an API-key login, session cost only.
+- Codex: `/status`. Never `/usage` there: a menu that can REDEEM a banked limit reset. Shows % LEFT, resets, credits.
+- Grok: `/usage` (alias `/cost`), Usage limit tab; older `/session-info`. Never `/usage manage` (billing). Its weekly bar has no used/left label.
+- Antigravity: `/usage` (alias `/quota`). Avoid `/credits` (purchase). Shows "Remaining" % per model family.
+- Unchecked: Gemini `/stats model`, Copilot `/usage`, Kimi `/usage`.
 
-No known in-CLI allowance view: Cursor (its `/usage` is activity), Aider, OpenCode, Goose, Crush, Amp, Kiro, Mistral Vibe, Open Interpreter, Qwen Code. Web pages: https://claude.ai/settings/usage, https://chatgpt.com/codex/settings/usage, https://console.x.ai; otherwise the provider's account page, never an invented URL.
+Cursor's `/usage` is activity, not allowance. Web pages: claude.ai/settings/usage, chatgpt.com/codex/settings/usage, console.x.ai; else the provider's account page; never invent one.
 
-On a host: the hosts named, else every connected one in `host.list` (this machine too when asked), each call through `host.call` there. Codex: `agent.readQuota` (that machine's Codex account; any of its projects): `ok`: per window `usedPercent`, `windowDurationMins` (300: five-hour), `resetsAt` (epoch ms), `planType`; `unavailable`, its `reason`.
+On a host: the hosts named, else every connected one in `host.list`. With `host.call`, this machine is a host too (`local`): no pane in a project. Codex: `agent.readQuota` (any project there): `ok`: per window `usedPercent`, `windowDurationMins` (300: five-hour), `resetsAt` (epoch ms), `planType`; `unavailable`, its `reason`.
 
 ```json tool=host.call surface=help-core
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.readQuota","args":{}}
 ```
 
-Other CLIs, or Codex's credits: steps 1-6 there, owned tools only.
+Other CLIs, or Codex's credits: steps 1-2 in any project there (`local`: your own tools; only a built-in command; no project: not checked), then a throwaway run:
 
-1. Resolve the agents with `agent.listAvailable`; say which you check and which you skip and why.
-2. Revalidate with `slashCommands.list` for that `agentId`: a command qualifies only if its description says usage, quota, limits or status and none of manage, redeem, reset, buy, purchase, upgrade, top up or billing; a known view this build no longer lists is not trusted. List unavailable or declined: send nothing; give the user the known command. Nothing qualifies: report no in-CLI allowance view. Never guess a command.
-3. Type only at an idle prompt in a terminal the user named that you own, or one you launch now with the exact `agentId`, `focusPolicy:"preserve"` and no `prompt`. Never your own pane. A fresh pane: decide nothing until one `terminal.waitUntilIdle`, then `terminal.getStatus` with `includeOutput`, shows its empty input line (a timeout: still starting; read again).
-   - Folder-trust dialog on a pane you just launched: the user asked for this check here, so the foundation's trust rule applies: `terminal.sendKeysOwned` (sidebar: `terminal.sendKeys`) `choose:"<the label shown>"`, wait for the input line, and report that you trusted it.
-   - Any other startup prompt (login, approval, update): the user's. Mark that agent not checked; the others go on.
-4. Send exactly the verified command, with no `handback`, `notify` or `waitForReply`. Confirm the view opened; if the agent took it as a chat message, stop and never resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing.
+```json
+{"hostId":"<hostId>","throwaway":true,"tool":"throwaway.launch","args":{"agentId":"<agentId>"},"newCallId":"<uuid>"}
+```
+
+Keep `result.structured.run.runId`; ambiguous: that `callId`, never a relaunch (no listing has it). Then, `args` `{runId,…}`: poll `throwaway.output` (`maxLines` 80) a few seconds apart, a minute at most, for the input line; answer a trust dialog (this check's) with `throwaway.sendKeys`, the key shown (`keys:["1"]`); `throwaway.sendCommand` (`command`); `throwaway.output` per step 5. Finally `throwaway.close` every run, whatever happened (`close-failed`: once more, say so); expiry is no cleanup. A launch answered `unsupported` (older Daintree, or throwaway off): steps 3-6 in one of its projects, owned tools.
+
+1. Resolve the agents with `agent.listAvailable`; say which you check, which you skip, and why.
+2. Revalidate with `slashCommands.list` for that `agentId`: a command qualifies only if its description says usage, quota, limits or status and none of manage, redeem, reset, buy, purchase, upgrade, top up, billing; a known view it no longer lists is untrusted. No list (unavailable, declined): send nothing, give the user the known command. Nothing qualifies: no in-CLI view. Never guess a command.
+3. Type only at an idle prompt: a terminal the user named that you own, or one you launch now (exact `agentId`, `focusPolicy:"preserve"`, no `prompt`), never your own pane. A fresh pane: act once `terminal.waitUntilIdle` then `terminal.getStatus` (`includeOutput`) shows its empty input line (timeout: still starting; read again).
+   - Folder-trust dialog on what you just launched: the foundation's trust rule (`choose`); wait for the input line; say you trusted it.
+   - Any other startup prompt (login, approval, update), here or in a throwaway run: the user's. That agent: not checked; the others go on.
+4. Send exactly the verified command, with no `handback`, `notify` or `waitForReply`. Confirm the view opened; taken as a chat message: stop, never resend it in another form. If the screen offers to buy, redeem, reset or change billing, select nothing.
 5. Read the panel with `terminal.getOutput` (`maxLines` about 80), exactly; still loading, one more read.
 6. Close every terminal you launched for this check, one `terminal.closeMany` per machine, except one at a startup prompt or unread, left for the user. A close awaiting confirmation (`CONFIRMATION_TIMEOUT`): leave it, say so, never retry.
 
-Report back, per machine and agent: remaining allowance per window as LEFT (convert USED as 100 − used, quoting the printed figure; an unlabelled percentage has unknown direction; session tokens are not an allowance); reset times exactly as shown with timezone; credits or premium requests; the source of every figure ("read from <agent>'s <command> screen", "<host>'s agent.readQuota") or "not checked: <reason>", never a figure you did not read now; every terminal you launched, with its host, closed or kept and why. Never add machines up: one account on two machines is one allowance shown twice. Most headroom: the largest % left on the same CLI and window, with plan and reset.
+Report back, per machine and agent: % LEFT per window (USED as 100 − used, quoting the printed figure; an unlabelled percentage has unknown direction; session tokens are no allowance); resets as shown, with timezone; credits or premium requests; each figure's source (screen and command, or `agent.readQuota`) or "not checked: <reason>", never a figure not read now; each terminal or run you launched, closed or kept and why. Never add machines up: one account on two machines is one allowance. Most headroom: the largest % left on the same CLI and window, with plan and reset.
