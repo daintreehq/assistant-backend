@@ -29,6 +29,7 @@ removed from round 3.
 | 5b | 133 | the same population, split at random | was **sealed** until the catalog-expansion decision (2026-09-28); scored once: 126/133. Treat as development from here |
 | 6a | 82 | the 18 runbooks added in round 6 (catalog 87 → 105) plus the restore operation of `migrate-worktree-database`: own requests, traps toward every neighbour, plain code work, pairs | **development** |
 | 6b | 83 | the same population, split at random | **sealed** until the round-6 retrain decision |
+| refresh-2026-10-25 | 48 | the next refresh's signoff: local vs remote continuation, one host vs several, held and draining work, the seven runbooks untrained at 146; criteria fixed in its README | **sealed** until the next retrain decision |
 
 Round 4 (2026-09-28) was written by four agents on the same read-only rule, and each case
 labelled blind by gpt-6-sol and gpt-6-astra: 319 of 320 were unanimous with the writer. Cases

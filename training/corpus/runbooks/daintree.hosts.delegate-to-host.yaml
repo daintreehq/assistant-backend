@@ -499,6 +499,9 @@ boundaries:
   - query: There is no remote run to hand over yet. Get an assistant ready in this repository on my other two machines first.
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: 2026-10-16-synthetic-audit
+  - query: "have the linux host pull the latest main and fix the flaky upload test there"
+    confusable_with: [daintree.hosts.sync-with-origin]
+    run: 2026-10-25-selector-refresh
 followups:
   - query: now start claude on the ticket there
     history:

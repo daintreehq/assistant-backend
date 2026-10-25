@@ -125,6 +125,12 @@ boundaries:
   - query: hand the refactor to a Codex agent instead of Claude, with what has been done so far
     confusable_with: [daintree.hosts.hand-off-swarm]
     run: runbook-2026-10-issue-112
+  - query: "claude hit its limit on the migration, get codex to finish it now instead"
+    confusable_with: [daintree.agents.resume-after-usage-limit]
+    run: 2026-10-25-selector-refresh
+  - query: "the claude agent is out of quota until tonight; hand the refactor to a fresh codex agent instead"
+    confusable_with: [daintree.agents.resume-after-usage-limit]
+    run: 2026-10-25-selector-refresh
 
 followups:
   - query: use codex rather than gemini for the successor, and make sure the brief says the pdfkit approach already failed

@@ -376,6 +376,12 @@ boundaries:
   - query: "the codex pane doing the hub's job crashed with an error screen, bring it back without losing its conversation"
     confusable_with: []
     run: runbook-2026-10-issue-106
+  - query: "the agent froze mid-turn after my laptop slept, get it running again"
+    confusable_with: [daintree.agents.resume-after-usage-limit]
+    run: 2026-10-25-selector-refresh
+  - query: "an agent's spawn failed with an auth error, sort it out"
+    confusable_with: [daintree.agents.resume-after-usage-limit]
+    run: 2026-10-25-selector-refresh
 followups:
   - query: how long has it actually been like that?
     history:

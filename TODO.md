@@ -34,6 +34,18 @@ for neighbours; the default `max_results` of 3 is the cheaper lever first.
 
 ---
 
+## Run the prepared selector refresh
+
+**Trigger: the user starts the next retrain, after #184, #185, #186 and the #167/#172
+routing changes have merged on `develop`.**
+
+`training/REFRESH-2026-10-25.md` holds the baseline, the loss inventory, the comparison
+to run (three stage-2 seeds, seed 41 ships, k=48 only if a candidate miss survives) and
+the unmet prerequisites. Its signoff set and criteria are frozen in
+`benchmarks/runbook_selection/holdout/refresh-2026-10-25/`.
+
+---
+
 ## Retrain the selector so a reserved candidate can actually be kept
 
 **Trigger: the next selector retrain — this rides along with it, and should not

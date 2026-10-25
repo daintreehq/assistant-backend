@@ -140,6 +140,9 @@ boundaries:
   - query: Both Remote Hosts connect normally, but the identical release commit passes the template tests on one and fails on the other. Establish why their results differ without edits.
     confusable_with: [daintree.hosts.connect-host]
     run: 2026-10-16-synthetic-audit
+  - query: "the build box and my laptop give different test results on the same commit; find out why"
+    confusable_with: [daintree.hosts.sync-with-origin]
+    run: 2026-10-25-selector-refresh
 
 followups:
   - query: now tell me why the linux row failed when the mac row passed

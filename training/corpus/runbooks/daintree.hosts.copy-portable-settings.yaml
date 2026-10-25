@@ -118,6 +118,9 @@ boundaries:
   - query: make the remote host match this machine's Daintree settings, every default category
     confusable_with: [daintree.hosts.configure-settings]
     run: runbook-2026-10-24-issue-171
+  - query: "copy my editor and terminal settings over to the other studio"
+    confusable_with: [daintree.hosts.sync-with-origin]
+    run: 2026-10-25-selector-refresh
 followups:
   - query: ok now bring my settings across too
     history:
