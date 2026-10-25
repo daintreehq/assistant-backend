@@ -88,13 +88,21 @@ dtrb.sh up ...` also starts the installation's global Assistant, with that agent
 isolated app's own assistant agent (`agentDefaults.set({assistantAgentId})`, in the run's
 user data only), through `help.ensureGlobalAssistant`, which is what its panel calls.
 `dtrb.sh trial --global "prompt"` types into its PTY as the person would. It has no panel, so
-the rig settles on its PTY's output activity and its screen is not captured: the evidence is
-its CLI transcript (Codex: the `~/.codex/sessions` rollout whose cwd is under the run's
+the rig settles on its PTY's output activity. `snap` writes its current screen to `global.txt`
+and the trial's `terminal-global-*.txt` holds its last screen, but the evidence is its CLI transcript (Codex: the `~/.codex/sessions` rollout whose cwd is under the run's
 `userdata/help-sessions/`; Claude Code: `~/.claude/projects/`). `dtrb.sh restart` quits the
 Shell and reopens it on the same user data, as a person restarting Daintree: hosts and
 their agents keep running and are reconnected, and the global Assistant starts again,
 resuming its conversation. Its checkpoints are under
 `userdata/assistant-run-checkpoints/global/`; copy them before and after the restart to
-inspect them independently. At `62205c1f` a Claude Code global Assistant cannot start: the
-Claude lane's readiness probe needs `actions.getContext` in a listing that carries only the
-three root tools (daintreehq/daintree#14483). Codex starts.
+inspect them independently. A Claude Code global Assistant starts from app `c394b45e`
+(daintreehq/daintree#14483, fixed by #14485). Its new session folder opens on Claude Code's
+trust dialog, whose default is "No, exit" because the folder pre-approves tools. The holder
+reads that screen from the PTY host (`terminal.getSerializedState`), because the data tap
+stays empty, and steps the highlight to "Yes, I trust this folder" before it presses Enter.
+Wait for `global assistant: trust dialog; accepting` in `holder.log` before the first
+`trial --global`. Typed into the dialog, the prompt quits the CLI.
+
+Keep run names to 4 characters or fewer (the hosts' SSH socket paths have a length limit).
+`runbooks stop` fails if the port is still served after it has stopped what it started,
+so a restarted server never silently leaves the old one answering.

@@ -330,8 +330,21 @@ test("hold an isolated Daintree for runbook trials", async () => {
     );
     holderLog(`global assistant ${st.agentId} ${globalTerminalId} running (generation ${st.generation})`);
   };
-  const globalText = async (): Promise<string> =>
-    globalTerminalId ? plainText(await page.evaluate(() => (window as any).__dtrbGlobal ?? "").catch(() => "")) : "";
+  // The tap stays empty for a terminal no panel renders: then read the PTY host's own
+  // screen, which is where a CLI's first-run trust dialog shows. Its serialisation writes
+  // the gaps between words as cursor-forward moves, which plainText would drop.
+  const globalText = async (): Promise<string> => {
+    if (!globalTerminalId) return "";
+    const tapped = await page.evaluate(() => (window as any).__dtrbGlobal ?? "").catch(() => "");
+    if (tapped) return plainText(tapped);
+    const snap = await page
+      .evaluate(
+        (id: string) => (window as any).electron.terminal.getSerializedState(id, { tailRows: 60 }),
+        globalTerminalId
+      )
+      .catch(() => null);
+    return plainText(String(snap?.data ?? "").replace(/\x1b\[(\d*)C/g, (_m, n: string) => " ".repeat(Number(n || 1))));
+  };
   // When its PTY last printed: the settle signal where the data tap stays empty.
   const globalActivity = async (): Promise<string> =>
     globalTerminalId
@@ -419,25 +432,34 @@ test("hold an isolated Daintree for runbook trials", async () => {
   };
 
   const globalTrusted = new Set<string>();
+  let globalDialogSeen = false;
   const serviceRig = async () => {
     if (fs.existsSync(path.join(RUN_DIR, "restart-app"))) {
       await restartApp().catch((e: unknown) => holderLog(`restart failed: ${e}`));
       fs.rmSync(path.join(RUN_DIR, "restart-app"), { force: true });
     }
+    // The PTY host's screen shows the dialog before the CLI reads its input, and Claude
+    // Code's default here is "No, exit": a key sent too early is lost and the Enter after
+    // it quits. So answer only a dialog already seen on an earlier poll, one key per poll,
+    // and press Enter only once the screen shows the highlight on the trust option.
     if (globalTerminalId && !globalTrusted.has(globalTerminalId)) {
       const text = (await globalText()).trimEnd();
-      if (TRUST_DIALOG.test(text.split("\n").slice(-30).join("\n"))) {
+      if (!TRUST_DIALOG.test(text.split("\n").slice(-30).join("\n"))) {
+        globalDialogSeen = false;
+      } else if (!globalDialogSeen) {
+        globalDialogSeen = true;
+      } else {
         const plan = TRUST_LABELS.map((label) => planChoice(text, label)).find((p) => p.ok);
-        if (plan?.ok) {
-          globalTrusted.add(globalTerminalId);
-          holderLog(`global assistant: trust dialog; accepting`);
-          for (const key of plan.keys) {
-            await page.evaluate(
-              ([id, data]: [string, string]) => (window as any).electron.terminal.write(id, data),
-              [globalTerminalId, key === "Enter" ? "\r" : key === "Down" ? "\x1b[B" : "\x1b[A"] as [string, string]
-            );
-            await page.waitForTimeout(150);
+        const key = plan?.ok ? plan.keys[0] : undefined;
+        if (key) {
+          if (key === "Enter") {
+            globalTrusted.add(globalTerminalId);
+            holderLog(`global assistant: trust dialog; accepting`);
           }
+          await page.evaluate(
+            ([id, data]: [string, string]) => (window as any).electron.terminal.write(id, data),
+            [globalTerminalId, key === "Enter" ? "\r" : key === "Down" ? "\x1b[B" : "\x1b[A"] as [string, string]
+          );
         }
       }
     }
@@ -467,6 +489,7 @@ test("hold an isolated Daintree for runbook trials", async () => {
         }
         fs.writeFileSync(path.join(out, `${name}-terminals.json`), JSON.stringify(terminals, null, 2));
       }
+      if (globalTerminalId) fs.writeFileSync(path.join(out, "global.txt"), await globalText());
       fs.rmSync(snapReq, { force: true });
       holderLog(`snap: ${out}`);
     }
