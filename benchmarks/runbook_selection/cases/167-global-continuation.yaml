@@ -5,8 +5,8 @@
 # runbook may ride along. Traps, by deliverable: work sent to other machines is
 # daintree.hosts.recover-and-clean-up; brand-new work across projects is a fan-out, not a resume;
 # a bare what-exists-now listing is the foundation's; passing coordination to a successor is
-# daintree.orchestration.hand-off-orchestration. Written without the selector model on the
-# authoring machine: unmeasured until `bench local` runs.
+# daintree.orchestration.hand-off-orchestration. Measured on the shipped selector: the mixed
+# local-plus-remote request still loses daintree.hosts.recover-and-clean-up (rank_miss).
 
 cases:
   # ------------------------------------------------------------------- recall
