@@ -117,7 +117,7 @@ import {
 import {
   RUNBOOKS_MCP_SERVER_NAME,
   buildRunbooksAddendum,
-  buildRunbooksHostHeaders,
+  buildRunbooksHeaders,
 } from "../../../../electron/services/helpSessionRunbooks";
 import {
   ASSISTANT_GLOBAL_CHECKPOINT_BUCKET,
@@ -140,6 +140,7 @@ import { SessionStore } from "../../../../electron/services/mcp-server/sessionSt
 import { NoFrontendAttachedError } from "../../../../electron/services/mcp-server/rendererBridge";
 import {
   getExternalBaseManifest,
+  getGlobalAssistantBaseManifest,
   getViewlessHelpBaseManifest,
 } from "../../../../electron/services/mcp-server/baseManifest";
 import {
@@ -336,7 +337,7 @@ const SURFACES: SurfaceSpec[] = [
     manifestSource: "viewless-help",
     global: true,
     description:
-      "This installation's one global Daintree Assistant (#14159, #14161), Tool set = Core: a help session main runs with no project and no view, its row naming GLOBAL_ASSISTANT_ID, listed from the viewless help base surface. Offered only its root tools (GLOBAL_ASSISTANT_TOOL_IDS); every project, this machine's under hostId local, is reached through host.call, where the host admits only GLOBAL_ALLOWED_TOOLS (recorded in capture.host_call), the owned tools acting on what it launched there or the person handed it.",
+      "This installation's one global Daintree Assistant (#14159, #14161), Tool set = Core: a help session main runs with no project and no view, its row naming GLOBAL_ASSISTANT_ID, listed from its own generated base surface (getGlobalAssistantBaseManifest, #14453). Offered only its root tools (GLOBAL_ASSISTANT_TOOL_IDS); every project, this machine's under hostId local, is reached through host.call, where the host admits only GLOBAL_ALLOWED_TOOLS (recorded in capture.host_call), the owned tools acting on what it launched there or the person handed it.",
   },
   {
     ...HELP,
@@ -487,7 +488,8 @@ function manifestFor(
     case "no-view":
       return getExternalBaseManifest();
     case "viewless-help":
-      return getViewlessHelpBaseManifest();
+      // The global assistant is viewless too, but main lists its own base surface (#14453).
+      return spec.global ? getGlobalAssistantBaseManifest() : getViewlessHelpBaseManifest();
   }
 }
 
@@ -805,7 +807,7 @@ describe("capture Daintree MCP surfaces", () => {
         if (!entry) {
           return spec.manifestSource === "view"
             ? "absent from ActionService.list({}) (isVisible false under an empty context, or restricted)"
-            : `absent from the ${spec.manifestSource === "no-view" ? "external" : "viewless help"} base manifest this session is listed from`;
+            : `absent from the ${spec.manifestSource === "no-view" ? "external" : spec.global ? "global assistant" : "viewless help"} base manifest this session is listed from`;
         }
         if (entry.mcpVisibility === "hidden") return "mcpVisibility: hidden";
         if (entry.danger === "restricted") return "danger: restricted";
@@ -829,8 +831,8 @@ describe("capture Daintree MCP surfaces", () => {
       // The host-control contract, stated outright as well.
       const ids = new Set(listedIds);
       for (const id of HOST_CONTROL_TOOL_IDS) {
-        // The global assistant is listed from the viewless base manifest, so a
-        // root tool appears only where that manifest carries it.
+        // The global assistant is listed from its own base manifest, so a root
+        // tool appears only where that manifest carries it.
         const inManifest = !spec.global || byId.has(id);
         expect(ids.has(id), `${spec.name}: ${id} listing`).toBe(
           gates.hostCall && globalRootOnly(id) && inManifest
@@ -1034,8 +1036,7 @@ describe("capture Daintree MCP surfaces", () => {
             ? {
                 native_setup: {
                   runbooks_mcp_server: RUNBOOKS_MCP_SERVER_NAME,
-                  runbooks_headers_connected: buildRunbooksHostHeaders("connected"),
-                  runbooks_headers_unknown: buildRunbooksHostHeaders(null),
+                  runbooks_headers: buildRunbooksHeaders(),
                   runbooks_addendum: buildRunbooksAddendum({ global: true }),
                   checkpoint_env: ASSISTANT_RUN_CHECKPOINT_ENV_VAR,
                   checkpoint_writer_env: ASSISTANT_RUN_CHECKPOINT_WRITER_ENV_VAR,

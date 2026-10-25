@@ -2,7 +2,7 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "2c6d1fb3d46061ceb8526a88efdb60f04d6f6f57",
+    "app_commit": "62205c1f360f4de49191d2e06348e4031cd168b9",
     "app_version": "0.46.0",
     "caller_origin": "agent-pane",
     "session_origin": "external",

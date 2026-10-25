@@ -117,3 +117,31 @@ cases:
     expect:
       required: [daintree.orchestration.hand-off-orchestration]
       optional: [daintree.foundation]
+
+  # ------------------------------------------------------- Global Assistant hand-over
+  - id: global-handover-coordination-to-global-assistant
+    category: single-runbook
+    note: >-
+      The coordinator is being replaced and the successor is this machine's Global
+      Assistant: still daintree.orchestration.hand-off-orchestration (freeze, handoff,
+      the user's Hand to orchestrator → Global Assistant), never a fresh resume. The
+      hosts hand-over may ride along on "carries on".
+    messages:
+      - role: user
+        content: hand coordination of this run over to the Global Assistant so it carries on after I close this pane
+    expect:
+      required: [daintree.orchestration.hand-off-orchestration]
+      optional: [daintree.foundation, daintree.hosts.hand-off-swarm]
+
+  - id: global-handover-global-assistant-takes-over-agents
+    category: single-runbook
+    note: >-
+      User-phrased: the Global Assistant takes over orchestrating these agents. A
+      successor coordinator from a handoff is hand-off-orchestration, not status-and-resume
+      (picking a run up yourself from its checkpoints).
+    messages:
+      - role: user
+        content: let the global assistant take over orchestrating these agents from here
+    expect:
+      required: [daintree.orchestration.hand-off-orchestration]
+      optional: [daintree.foundation]

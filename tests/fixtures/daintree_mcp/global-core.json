@@ -2,7 +2,7 @@
   "capture": {
     "app_repo": "daintreehq/daintree",
     "app_branch": "develop",
-    "app_commit": "2c6d1fb3d46061ceb8526a88efdb60f04d6f6f57",
+    "app_commit": "62205c1f360f4de49191d2e06348e4031cd168b9",
     "app_version": "0.46.0",
     "caller_origin": "global",
     "session_origin": "help",
@@ -13,7 +13,7 @@
       "renderer_owned_origin": true,
       "relay": false
     },
-    "caller": "This installation's one global Daintree Assistant (#14159, #14161), Tool set = Core: a help session main runs with no project and no view, its row naming GLOBAL_ASSISTANT_ID, listed from the viewless help base surface. Offered only its root tools (GLOBAL_ASSISTANT_TOOL_IDS); every project, this machine's under hostId local, is reached through host.call, where the host admits only GLOBAL_ALLOWED_TOOLS (recorded in capture.host_call), the owned tools acting on what it launched there or the person handed it.",
+    "caller": "This installation's one global Daintree Assistant (#14159, #14161), Tool set = Core: a help session main runs with no project and no view, its row naming GLOBAL_ASSISTANT_ID, listed from its own generated base surface (getGlobalAssistantBaseManifest, #14453). Offered only its root tools (GLOBAL_ASSISTANT_TOOL_IDS); every project, this machine's under hostId local, is reached through host.call, where the host admits only GLOBAL_ALLOWED_TOOLS (recorded in capture.host_call), the owned tools acting on what it launched there or the person handed it.",
     "host_control": {
       "help_session": true,
       "call_reachable": true,
@@ -29,9 +29,9 @@
     "captured_at": "2026-10-25",
     "mcp_protocol_version": "2025-11-25",
     "method": "Real ActionService.list({}, {includeSchemas:true}) over the real createActionDefinitions registry (or the app's generated base surface where the session has no view), served by the real createSessionServer (electron/services/mcp-server/sessionServer.ts) over the real SessionStore configured as this caller, with the real bindHostControl over a stand-in runtime that answers only isCallReachable, and read back as raw JSON-RPC tools/list over the MCP SDK in-memory transport, JSON round-tripped. Input schemas and descriptions cross-checked against the app's measureWireSurface helper.",
-    "surface_hash": "9a046ac9778f4d990f8c46ee5adf3f413bf239ce53d2b3fafe4ef8f20d1d7288",
+    "surface_hash": "b95560c2b68d80c46bed46d2eb3b544d7bb114958bd6357bf9495aabfb00f56f",
     "surface_hash_method": "buildSurfaceManifest(manifest, tier, appVersion, sessionPolicy) — the function the mcp.surface handler calls with the same inputs; the real tools/call was refused in the capture harness: {\"content\":[{\"type\":\"text\",\"text\":\"{\\\"code\\\":\\\"NO_FRONTEND_ATTACHED\\\",\\\"message\\\":\\\"The global assistant has no project of its own, so it reaches projects only through host.call. Nothing was run.\\\",\\\"retriable\\\":true}\"}],\"isError\":true}",
-    "tool_count": 0,
+    "tool_count": 3,
     "allowlisted_but_not_listed": [
       {
         "action_id": "actions.getContext",
@@ -86,20 +86,8 @@
         "reason": "not a root tool of the global assistant: it reaches every project through host.call"
       },
       {
-        "action_id": "host.call",
-        "reason": "absent from the viewless help base manifest this session is listed from"
-      },
-      {
         "action_id": "host.ensureProject",
         "reason": "not a root tool of the global assistant: it reaches every project through host.call"
-      },
-      {
-        "action_id": "host.list",
-        "reason": "absent from the viewless help base manifest this session is listed from"
-      },
-      {
-        "action_id": "host.settings",
-        "reason": "absent from the viewless help base manifest this session is listed from"
       },
       {
         "action_id": "mcp.surface",
@@ -223,7 +211,11 @@
       "host.list",
       "host.settings"
     ],
-    "root_tools_listed": [],
+    "root_tools_listed": [
+      "host.call",
+      "host.list",
+      "host.settings"
+    ],
     "host_call": {
       "admits": [
         "actions.getContext",
@@ -325,23 +317,1351 @@
     },
     "native_setup": {
       "runbooks_mcp_server": "daintree-runbooks",
-      "runbooks_headers_connected": {
-        "Daintree-Host-Control": "1",
-        "Daintree-Hosts": "connected"
-      },
-      "runbooks_headers_unknown": {
+      "runbooks_headers": {
         "Daintree-Host-Control": "1"
       },
-      "runbooks_addendum": "## Runbooks First\n\n`daintree-runbooks` is on, and it comes before everything below: `search_runbooks` returns Daintree's procedure for a task, and following it is how you do the task.\n\n**Never search for chat or a \"how do I…\" question:** answer Daintree ones from `daintree-docs`; runbooks are procedures, not documentation. **Before acting on any request to do something, call it** — before your first `daintree` call, even when it looks simple. A question about live state (\"how much usage is left?\", \"why is it slow?\") is a task. **One search per task:** never search for a step of it, a follow-up on it (closing its agents included) or a notice; those run on the runbooks you have.\n\n`query`: one sentence, 8–15 words, saying what the user wants done as they would type it. Keep every part of the task and any condition on how (\"…and start an agent on it\", \"…without fixing anything\"). Leave out specifics: numbers, branch, file, repo and people's names, pasted output, prompt text. Don't narrate (\"User wants…\", \"ask whether…\"). Pass `max_results: 3`.\n\n**Tool names:** you have no project of your own: `host.list` finds projects, and every step a runbook gives runs through `host.call` with that project's `hostId` and `projectId` (`local` for this machine). Call the tools it names as written, `terminal.sendCommandOwned`, `terminal.sendKeysOwned` and `terminal.closeOwned` included; they act on what you launched there or the user handed you, and you can close only what you launched. Their `notify` steps apply to you too. A host's own settings, turning Canopy on included, are read and changed with `host.settings`, never through `host.call`.\n\nFollow the runbooks with `selected: true` and the `supporting_runbooks` that come with them (the foundation they build on), and ignore the unselected ones. None selected: carry on and don't mention it. Another step naming a tool you lack: find the equivalent with `actions.search` through `host.call`, or tell the user. If the search fails, retry once, then proceed and say the runbook couldn't be loaded.\n",
+      "runbooks_addendum": "## Runbooks First\n\n`daintree-runbooks` is on, and it comes before everything below: `search_runbooks` returns Daintree's procedure for a task, and following it is how you do the task.\n\n**Never search for chat or a \"how do I…\" question:** answer Daintree ones from `daintree-docs`; runbooks are procedures, not documentation. **Before acting on any request to do something, call it** — before your first `daintree` call, even when it looks simple. A question about live state (\"how much usage is left?\", \"why is it slow?\") is a task. **One search per task:** never search for a step of it, a follow-up on it (closing its agents included) or a notice; those run on the runbooks you have.\n\n`query`: one sentence, 8–15 words, saying what the user wants done as they would type it. Keep every part of the task and any condition on how (\"…and start an agent on it\", \"…without fixing anything\"). Leave out specifics: numbers, branch, file, repo and people's names, pasted output, prompt text. Don't narrate (\"User wants…\", \"ask whether…\"). Pass `max_results: 3`.\n\n**Tool names:** you have no project of your own: `host.list` finds projects, a page per host (follow `projectInventory.nextCursor`, or narrow by `projectQuery`, before calling one missing), and every step a runbook gives runs through `host.call` with that project's `hostId` and `projectId` (`local` for this machine). Call the tools it names as written, `terminal.sendCommandOwned`, `terminal.sendKeysOwned` and `terminal.closeOwned` included; they act on what you launched there or the user handed you, and you can close only what you launched. Their `notify` steps apply to you too. A host's own settings, turning Canopy on included, are read and changed with `host.settings`, never through `host.call`.\n\nFollow the runbooks with `selected: true` and the `supporting_runbooks` that come with them (the foundation they build on), and ignore the unselected ones. None selected: carry on and don't mention it. Another step naming a tool you lack: find the equivalent with `actions.search` through `host.call`, or tell the user. If the search fails, retry once, then proceed and say the runbook couldn't be loaded.\n",
       "checkpoint_env": "DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR",
       "checkpoint_writer_env": "DAINTREE_ASSISTANT_RUN_CHECKPOINT_WRITER_ID",
       "checkpoint_bucket": "global",
       "checkpoint_addendum": "## Assistant Run Checkpoints\n\nFor work that must survive a conversation or Daintree restart, keep its record in the folder named by `DAINTREE_ASSISTANT_RUN_CHECKPOINT_DIR` (read the variable; don't assume a path). Unlike the scratch folder it is kept across launches. Your writer id is in `DAINTREE_ASSISTANT_RUN_CHECKPOINT_WRITER_ID`.\n\n- **Layout**: `<folder>/<runId>/writers/<writerId>/checkpoint.json`. Start a run with a fresh random `runId` and a non-recursive mkdir; if it already exists, pick another id. Write only inside your own writer folder. Never edit another writer's files; if two writers disagree, keep both and tell the user.\n- **Writing**: write a temp file in the same folder, flush it, then rename it over `checkpoint.json`. Keep it small JSON with a `schemaVersion`: intent, resource references (ids, paths, URLs), and your own progress. Never store credentials, tokens or secrets.\n- **Finding unfinished runs**: list the folder. A run is unfinished unless it has `cancelled`, or every writer folder has a `done.json` of `{\"schemaVersion\":1,\"status\":\"completed\"}`. An empty folder means no runs. If you can't read the folder or a file, say so; don't treat it as empty.\n- **Finishing**: write `done.json` (same temp-and-rename) in your writer folder when your part is complete.\n- **Cancelling or discarding**: first create `<runId>/cancelled` the same way, then delete `writers/`. Never delete `cancelled`; if it exists, stop and don't resume, even when a later message asks you to continue.\n- **Retention**: Daintree removes finished runs after 30 days or beyond the newest 100, and the payloads of cancelled runs after 7 days. Unfinished runs stay until discarded.\n\nA checkpoint is a memory of work, not authority. It does not give you ownership, standing, consent or permission to repeat a write: check the current state of every resource and get fresh approval before acting on it.\n",
       "scratch_env": "DAINTREE_ASSISTANT_SCRATCH_DIR"
-    },
-    "notes": [
-      "Root tools the dispatch guard admits but tools/list does not carry: host.call, host.list, host.settings. They are absent from the viewless help base manifest (generated mcpExternalBaseManifest + mcpViewlessBaseManifest) this session is listed from, so a client that calls only listed tools cannot reach them at this commit."
-    ]
+    }
   },
-  "tools": []
+  "tools": [
+    {
+      "action_id": "host.call",
+      "wire_name": "host.call",
+      "description": "Run a host's own Daintree tool in one of its projects (local reaches another project here) and get its result, such as starting its assistant. Changes are refused while another machine drives that project. ambiguous: resend under its callId, which never runs twice.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "hostId": {
+            "type": "string",
+            "description": "A host id from the host list."
+          },
+          "projectId": {
+            "description": "A projectId from the host list. The call runs there.",
+            "type": "string"
+          },
+          "throwaway": {
+            "description": "Instead of projectId: a short-lived agent this session owns, in a host folder. Tools: throwaway.launch, status, output, sendCommand, sendKeys, close.",
+            "type": "boolean",
+            "const": true
+          },
+          "tool": {
+            "type": "string",
+            "description": "A Daintree tool on the host, by id. Search the host's own tools through this."
+          },
+          "args": {
+            "description": "The tool's own arguments.",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "callId": {
+            "description": "Resend an ambiguous call under its callId. It never runs twice.",
+            "type": "string"
+          },
+          "newCallId": {
+            "description": "Your own fresh UUID for a write; with no answer back, resend under it as callId. Never both.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hostId",
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ambiguous",
+              "opted_out",
+              "disconnected",
+              "unsupported",
+              "policy_rejected",
+              "expired",
+              "not_found",
+              "rate_limited",
+              "too_large",
+              "conflict"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryAfterMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "callId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "isError": {
+                    "type": "boolean"
+                  },
+                  "structured": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "text": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "isError",
+                  "structured",
+                  "text"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "outcome",
+          "detail",
+          "retryAfterMs",
+          "callId",
+          "result"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Run a tool on a host",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "host.list",
+      "wire_name": "host.list",
+      "description": "List the hosts this assistant reaches, this machine first as local, as observed: link flags, build, installed CLIs, load sample, agent counts and a page of each connected host's projects, which calls name. Null means unmeasured.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includeAgents": {
+            "description": "Also list each host's agents: its workers and Daintree Assistants, as observed. Read the coverage before reading an empty list as nothing running.",
+            "type": "boolean"
+          },
+          "projectId": {
+            "description": "With includeAgents, list only the agents of this project (a projectId from the list).",
+            "type": "string"
+          },
+          "hostId": {
+            "description": "List only this host.",
+            "type": "string"
+          },
+          "projectQuery": {
+            "description": "Only projects whose name contains this, any case.",
+            "type": "string"
+          },
+          "projectCursor": {
+            "description": "A projectInventory.nextCursor: that host's next page, same query.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "hosts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hostId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "connection": {
+                  "type": "string",
+                  "enum": [
+                    "connected",
+                    "connecting",
+                    "disconnected"
+                  ]
+                },
+                "link": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "local",
+                        "disconnected",
+                        "connecting",
+                        "connected",
+                        "unreachable",
+                        "version-mismatch",
+                        "driven-elsewhere"
+                      ]
+                    },
+                    "attempt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "restarting": {
+                      "type": "boolean",
+                      "description": "It said it was shutting down; still retried."
+                    },
+                    "hostModeOff": {
+                      "type": "boolean",
+                      "description": "ssh got in; no Daintree in Host mode there."
+                    },
+                    "stoppedRetrying": {
+                      "description": "Waits for a Connect: login refused, Host mode off or unusable.",
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "disconnectedByPerson": {
+                      "type": "boolean"
+                    },
+                    "quietSince": {
+                      "description": "Connected; silent since.",
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "mismatch": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "protocol",
+                                "version",
+                                "commit"
+                              ]
+                            },
+                            "local": {
+                              "type": "string"
+                            },
+                            "remote": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "local",
+                            "remote"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Builds differ; blocking only under version-mismatch."
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "attempt",
+                    "restarting",
+                    "hostModeOff",
+                    "stoppedRetrying",
+                    "disconnectedByPerson",
+                    "quietSince",
+                    "mismatch"
+                  ],
+                  "additionalProperties": false
+                },
+                "build": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "connected",
+                        "rejected",
+                        "last-seen",
+                        "unknown"
+                      ]
+                    },
+                    "handshake": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "string"
+                            },
+                            "commit": {
+                              "type": "string"
+                            },
+                            "protocolVersion": {
+                              "type": "number"
+                            },
+                            "platform": {
+                              "type": "string",
+                              "enum": [
+                                "darwin",
+                                "linux"
+                              ]
+                            },
+                            "arch": {
+                              "type": "string",
+                              "enum": [
+                                "x64",
+                                "arm64"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "commit",
+                            "protocolVersion",
+                            "platform",
+                            "arch"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "handshake"
+                  ],
+                  "additionalProperties": false
+                },
+                "agentClis": {
+                  "type": "object",
+                  "properties": {
+                    "coverage": {
+                      "type": "string",
+                      "enum": [
+                        "observed",
+                        "stale",
+                        "unknown"
+                      ]
+                    },
+                    "sampledAt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "installed": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "agentId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "agentId",
+                          "version"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "omitted": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "coverage",
+                    "sampledAt",
+                    "installed",
+                    "omitted"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Installed only: sign-in and quota unknown. Absence unproven."
+                },
+                "rttMs": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "lastSeenAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "load": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "sampledAt": {
+                          "type": "number"
+                        },
+                        "ageMs": {
+                          "type": "number"
+                        },
+                        "stale": {
+                          "type": "boolean",
+                          "description": "Too old to trust: the live figures below are null. Not a zero reading."
+                        },
+                        "platform": {
+                          "type": "string",
+                          "enum": [
+                            "darwin",
+                            "linux"
+                          ]
+                        },
+                        "cpuPercent": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "cpuLogicalCores": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "cpuBusyCores": {
+                          "description": "cpuPercent of the cores it is a share of: all logical cores, or a cgroup quota.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "cpuIdleCores": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryTotalBytes": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryUsedBytes": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryAvailableBytes": {
+                          "description": "Total minus used, as the host counts.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "memoryCapacityReported": {
+                          "type": "boolean",
+                          "description": "False: an older host whose used memory includes file cache, so none is given."
+                        },
+                        "memoryPressure": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "normal",
+                                "warn",
+                                "critical"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "thermal": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "nominal",
+                                "fair",
+                                "serious",
+                                "critical"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "metricsScope": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "host",
+                                "cgroup"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "memoryPressureSomeAvg10": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "temperatureCelsius": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "temperatureZone": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "sampledAt",
+                        "ageMs",
+                        "stale",
+                        "platform",
+                        "cpuPercent",
+                        "cpuLogicalCores",
+                        "cpuBusyCores",
+                        "cpuIdleCores",
+                        "memoryTotalBytes",
+                        "memoryUsedBytes",
+                        "memoryAvailableBytes",
+                        "memoryCapacityReported",
+                        "memoryPressure",
+                        "thermal"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Null: no sample. Any null field inside is unknown, never zero or unlimited."
+                },
+                "agentsObserved": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "working": {
+                          "type": "number"
+                        },
+                        "waiting": {
+                          "type": "number"
+                        },
+                        "idle": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "working",
+                        "waiting",
+                        "idle"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "projects": {
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "frontendAttached": {
+                            "description": "A frontend is attached: a view there or a driving Shell. If false, only tools the host runs itself run. Null: unknown.",
+                            "type": [
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "projectId",
+                          "name",
+                          "frontendAttached"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "projectInventory": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "complete": {
+                          "type": "boolean",
+                          "description": "This answer names every match. With a total, pages walked to a null nextCursor name them all."
+                        },
+                        "total": {
+                          "description": "Null: past the host's own list limit.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "offset": {
+                          "type": "number"
+                        },
+                        "omitted": {
+                          "description": "Matching projects not named here, earlier pages too.",
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "nextCursor": {
+                          "description": "projectCursor for the next page.",
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "listChanged": {
+                          "type": "boolean",
+                          "description": "The list changed since the cursor: its first page again."
+                        }
+                      },
+                      "required": [
+                        "complete",
+                        "total",
+                        "offset",
+                        "omitted",
+                        "nextCursor",
+                        "listChanged"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "control": {
+                  "type": "boolean"
+                },
+                "agents": {
+                  "type": "object",
+                  "properties": {
+                    "coverage": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "stale",
+                        "unreachable",
+                        "unsupported"
+                      ]
+                    },
+                    "observedAt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "complete": {
+                      "type": "boolean"
+                    },
+                    "omitted": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "const": "live"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "worker",
+                                  "assistant"
+                                ]
+                              },
+                              "subject": {
+                                "type": "object",
+                                "properties": {
+                                  "hostId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "scope": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "project"
+                                          },
+                                          "projectId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 256
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "projectId"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "const": "global"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "terminalId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  },
+                                  "incarnation": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "lane": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 2
+                                  }
+                                },
+                                "required": [
+                                  "hostId",
+                                  "scope",
+                                  "terminalId",
+                                  "incarnation"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "agentId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "agentState": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "idle",
+                                      "working",
+                                      "waiting",
+                                      "directing",
+                                      "completed",
+                                      "exited"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "waitingReason": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "prompt",
+                                      "question",
+                                      "approval",
+                                      "error"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "since": {
+                                "type": [
+                                  "number",
+                                  "null"
+                                ]
+                              },
+                              "label": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "attached": {
+                                "type": [
+                                  "boolean",
+                                  "null"
+                                ]
+                              },
+                              "handback": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "observedAt": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "observedAt"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "confirmations": {
+                                "type": "object",
+                                "properties": {
+                                  "waiting": {
+                                    "maxItems": 4,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "actionId": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 128
+                                        },
+                                        "since": {
+                                          "type": "number"
+                                        },
+                                        "expiresAt": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "actionId",
+                                        "since",
+                                        "expiresAt"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "omitted": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "waiting",
+                                  "omitted"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "notices": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "pending": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "ready": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "delivery": {
+                                        "type": "string",
+                                        "enum": [
+                                          "idle",
+                                          "scheduled",
+                                          "held",
+                                          "blocked",
+                                          "outstanding",
+                                          "failed"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "pending",
+                                      "ready",
+                                      "delivery"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "role",
+                              "subject",
+                              "agentId",
+                              "agentState",
+                              "waitingReason",
+                              "since",
+                              "label",
+                              "attached",
+                              "handback"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "const": "resumable"
+                              },
+                              "role": {
+                                "type": "string",
+                                "const": "assistant"
+                              },
+                              "hostId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "scope": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "project"
+                                  },
+                                  "projectId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 256
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "projectId"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "lane": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2
+                              },
+                              "agentId": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "capturedAt": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "role",
+                              "hostId",
+                              "scope",
+                              "lane",
+                              "agentId",
+                              "capturedAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "coverage",
+                    "observedAt",
+                    "complete",
+                    "omitted",
+                    "entries"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "hostId",
+                "name",
+                "connection",
+                "link",
+                "build",
+                "agentClis",
+                "rttMs",
+                "lastSeenAt",
+                "load",
+                "agentsObserved",
+                "projects",
+                "projectInventory",
+                "control"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "hosts"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "List hosts",
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "query",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    },
+    {
+      "action_id": "host.settings",
+      "wire_name": "host.settings",
+      "description": "Read or change named settings on hosts, such as turning Canopy on across several. preview returns a ticket and changes nothing; apply asks the person to approve exactly that preview, then writes it. Never this machine's own settings.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "read",
+              "preview",
+              "apply"
+            ],
+            "description": "read: current values. preview: what patch would change, and a ticket. apply: run it."
+          },
+          "hostIds": {
+            "description": "For read and preview: the exact hosts, up to 8.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "A host id from the host list."
+            }
+          },
+          "keys": {
+            "description": "For read: which settings, up to 5. Default: all.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "canopyMode",
+                "agentDefaults.defaultAgent",
+                "agentDefaults.assistantAgentId",
+                "idleTerminalNotify.enabled",
+                "idleTerminalNotify.thresholdMinutes"
+              ]
+            }
+          },
+          "patch": {
+            "description": "For preview: values to set on every host named.",
+            "type": "object",
+            "properties": {
+              "canopyMode": {
+                "type": "string",
+                "enum": [
+                  "unset",
+                  "on",
+                  "hidden"
+                ]
+              },
+              "agentDefaults.defaultAgent": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "agentDefaults.assistantAgentId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "idleTerminalNotify.enabled": {
+                "type": "boolean"
+              },
+              "idleTerminalNotify.thresholdMinutes": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          },
+          "ticket": {
+            "description": "For apply: a preview's ticket. The person approves it in a dialog here first.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "ambiguous",
+              "opted_out",
+              "disconnected",
+              "unsupported",
+              "policy_rejected",
+              "expired",
+              "not_found",
+              "rate_limited",
+              "too_large",
+              "conflict"
+            ]
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryAfterMs": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ticket": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hosts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hostId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "ambiguous",
+                    "opted_out",
+                    "disconnected",
+                    "unsupported",
+                    "policy_rejected",
+                    "expired",
+                    "not_found",
+                    "rate_limited",
+                    "too_large",
+                    "conflict"
+                  ]
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "settings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "enum": [
+                          "canopyMode",
+                          "agentDefaults.defaultAgent",
+                          "agentDefaults.assistantAgentId",
+                          "idleTerminalNotify.enabled",
+                          "idleTerminalNotify.thresholdMinutes"
+                        ]
+                      },
+                      "value": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      },
+                      "proposed": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "hostId",
+                "name",
+                "outcome",
+                "detail",
+                "settings"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "outcome",
+          "detail",
+          "retryAfterMs",
+          "ticket",
+          "hosts"
+        ],
+        "additionalProperties": false
+      },
+      "annotations": {
+        "title": "Change a host's settings",
+        "readOnlyHint": false,
+        "idempotentHint": false,
+        "destructiveHint": false,
+        "openWorldHint": true
+      },
+      "daintree": {
+        "kind": "command",
+        "category": "help",
+        "danger": "safe",
+        "band": "reversible",
+        "surface_tier": "core",
+        "reach": "tier"
+      }
+    }
+  ]
 }
