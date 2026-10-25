@@ -343,6 +343,40 @@ def _category_floor(
             )
 
 
+def _forbidden_load_checks(checks: _Checks, doc: Mapping[str, Any]) -> None:
+    """No case may load a runbook it forbids, whatever the aggregate rates say.
+
+    A forbidden load already fails that case's recall, but recall is gated as a
+    rate, so a named wrong-workflow boundary could regress while the rate stayed
+    above its floor. An exclusion is a different contract from a tolerated extra:
+    the forbidden runbook is delivered in full to a caller that must not follow
+    it. So the count is gated at zero, and reconciled against the per-case list
+    it summarises, which is what names the cases when it is not.
+    """
+    checks.exactly_zero("forbidden_cases")
+    count = checks.value("forbidden_cases")
+    per_case = doc.get("forbidden")
+    case_ids = doc.get("case_ids")
+    if not isinstance(per_case, list) or not isinstance(case_ids, list):
+        checks.note("forbidden or case_ids is missing — forbidden loads cannot be named")
+        return
+    if len(per_case) != len(case_ids):
+        checks.note(
+            f"forbidden has {len(per_case)} entries for {len(case_ids)} cases — "
+            f"forbidden loads cannot be attributed"
+        )
+        return
+    wrong = [(cid, ids) for cid, ids in zip(case_ids, per_case, strict=True) if ids]
+    if count is not None and count != len(wrong):
+        checks.note(
+            f"forbidden_cases={count:g} but {len(wrong)} cases list a forbidden load — "
+            f"the count does not match the cases"
+        )
+    for cid, ids in wrong:
+        loaded = ", ".join(ids) if isinstance(ids, list) else repr(ids)
+        checks.note(f"forbidden load: {cid} selected {loaded}")
+
+
 def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
     """The suite that qualifies a release: the shipped ONNX artifact, offline.
 
@@ -356,7 +390,7 @@ def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
     is checked too, well below the measurement, so a precision collapse still
     reddens this.
 
-    Two gates exist only here.
+    Three gates exist only here.
 
     **Stage-1 candidate recall.** ``candidate_miss`` counts required runbooks that
     never reached the head at all — not ranked low, absent. No admission floor
@@ -364,6 +398,9 @@ def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
     rate. It is trivially satisfied at 38 runbooks against ``k=32``, and that is
     the point of gating it now: it is the number that moves first as the catalog
     grows, and no other suite can currently see it.
+
+    **Forbidden loads.** A case that loads a runbook it forbids fails the run on
+    its own (:func:`_forbidden_load_checks`), not only through the recall rate.
 
     **Latency, decomposed.** The local selector sits on the first-byte path with
     no fallback, so its p90 is a product property. Gated on the total rather than
@@ -404,6 +441,7 @@ def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
         checks.failures.extend(f"docs.{f}" for f in docs_checks.failures)
 
     checks.exactly_zero("candidate_miss_runbooks")
+    _forbidden_load_checks(checks, doc)
 
     # Every missing runbook must be attributed to exactly one stage. Without this
     # the histogram can quietly under-count — which it did: a background-wake

@@ -55,6 +55,11 @@ without it while a spare runbook costs prompt bytes. Extras are designed
 behaviour here and a defect there. The strict rate is reported and gated too,
 well below the measurement, so a precision collapse still reddens the suite.
 
+An extra the case **forbids** (`expect.forbid`, or the wrong end of a hub/lane pair) is
+not a tolerated extra: `local` fails on any one of them (`forbidden_cases`, gated at
+zero and naming each case), whatever the rates say. Optional neighbours and unlisted
+extras keep the contract above.
+
 ## Quick start
 
 ```bash
