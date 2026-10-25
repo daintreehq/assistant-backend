@@ -78,22 +78,23 @@ use a Claude assistant for operator calls as the assistant, `--on HOST` for host
 load for all of them, so a placement choice between hosts (#170) can be exercised for
 mechanics but not for a real capacity difference. Hosts are macOS only, reached over
 loopback ssh, never a Linux box or a real network drop. Agent listings for remote hosts
-come back `coverage: "unsupported"` at app `d3451414d5`. The projectless global Assistant
-cannot be the caller: its `tools/list` is empty (below). Search-driven trials need the
+come back `coverage: "unsupported"` at app `d3451414d5`. The global Assistant is a caller
+since app #14465 (below). Search-driven trials need the
 selector model locally (`training/fetch_selector.sh`); without it the assistant reports the
 runbook server unreachable and acts unguided.
 
-**The global Assistant gap** (open at app `d3451414d5`, as at `1752ef90`). A global session's
-`tools/list` keeps only `GLOBAL_ASSISTANT_TOOL_IDS` (`host.list`, `host.call`,
-`host.settings`; `shared/config/globalAssistant.ts`) out of the manifest it is served
-(`electron/services/mcp-server/sessionServer.ts`, the `ListToolsRequestSchema` handler,
-`globalSession` filter). A viewless help session is served `getViewlessHelpBaseManifest()`
-(`electron/services/mcp-server/httpLifecycle.ts`, `requestManifest`, the
-`viewlessProjectId !== null` branch), which is `MCP_EXTERNAL_BASE_MANIFEST` plus
-`MCP_VIEWLESS_BASE_MANIFEST` (`electron/services/mcp-server/baseManifest.ts`). Neither
-generated manifest carries a `host.*` entry: the viewless one is built from
-`VIEWLESS_ACTIONS` plus a fixed `MAIN_PROCESS_TOOLS` list in
-`src/services/actions/__tests__/mcpExternalBaseManifest.test.ts`, which names no `host.*`
-tool. So the listing is empty, while the dispatch gate (`isGlobalSession()` in
-`handleCallTool`) lets exactly those three through. Seen statically; the rig does not
-start the global Assistant.
+**The global Assistant as caller** (app `62205c1f` on). `DTRB_GLOBAL_AGENT=claude|codex
+dtrb.sh up ...` also starts the installation's global Assistant, with that agent set as the
+isolated app's own assistant agent (`agentDefaults.set({assistantAgentId})`, in the run's
+user data only), through `help.ensureGlobalAssistant`, which is what its panel calls.
+`dtrb.sh trial --global "prompt"` types into its PTY as the person would. It has no panel, so
+the rig settles on its PTY's output activity and its screen is not captured: the evidence is
+its CLI transcript (Codex: the `~/.codex/sessions` rollout whose cwd is under the run's
+`userdata/help-sessions/`; Claude Code: `~/.claude/projects/`). `dtrb.sh restart` quits the
+Shell and reopens it on the same user data, as a person restarting Daintree: hosts and
+their agents keep running and are reconnected, and the global Assistant starts again,
+resuming its conversation. Its checkpoints are under
+`userdata/assistant-run-checkpoints/global/`; copy them before and after the restart to
+inspect them independently. At `62205c1f` a Claude Code global Assistant cannot start: the
+Claude lane's readiness probe needs `actions.getContext` in a listing that carries only the
+three root tools (daintreehq/daintree#14483). Codex starts.

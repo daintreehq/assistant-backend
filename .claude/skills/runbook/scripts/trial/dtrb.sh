@@ -8,6 +8,8 @@
 #         --hosts 1-3: also N isolated Remote Hosts (Host mode, private sshd on 127.0.0.1),
 #         each with a clone of the scratch repo at the same base commit, added to the Shell
 #         (DTRB_HOST_WITHOUT_PROJECT=N: host N opens an unrelated repo instead)
+#         DTRB_GLOBAL_AGENT=claude|codex: also start the installation's global Assistant as
+#         that agent (set in the isolated app's own settings, never the user's)
 #   dtrb.sh trial [opts] "prompt"  launch one agent pane with the prompt; wait; summarise
 #         --agent claude|codex (claude)  --model M (haiku)  --timeout MIN (20)  --id NAME
 #         --flag ARG (repeatable, verbatim CLI flag)  --no-wait  -f PROMPT_FILE
@@ -15,10 +17,14 @@
 #         --adopt ID[,ID]              hand those terminals to the trial pane at launch
 #         --assistant                  type the prompt into the Shell's own Daintree Assistant
 #                                      (the host.* caller) instead of launching a pane
+#         --global                     type the prompt into the global Assistant (needs
+#                                      DTRB_GLOBAL_AGENT at up); its transcript is the evidence
 #   dtrb.sh wait <trial-id>        wait for a trial to settle, then summarise
 #   dtrb.sh summary <trial-id> [--full|--json]
 #   dtrb.sh send "<text>" [terminal-id]   type a user follow-up into the trial pane mid-trial
 #   dtrb.sh adopt <id[,id]> <orchestrator-pane-id>   the user's mid-trial hand-over gesture
+#   dtrb.sh restart                quit the Shell and reopen it on the same user data, as a person
+#                                  restarting Daintree; hosts stay up, the global Assistant restarts
 #   dtrb.sh hold on|off            keep the running trial from settling while you act by hand
 #   dtrb.sh reset                  close agent panes, restore the scratch repo to its seed
 #   dtrb.sh mcp [--as help] [--on HOST] <action> '<json>'   call an ISOLATED app's MCP:
@@ -382,6 +388,7 @@ cmd_trial() {
       --adopt) adopt="$2"; shift 2 ;;
       --name) pname="$2"; shift 2 ;;
       --assistant) assistant=1; shift ;;
+      --global) assistant=global; shift ;;
       -f) prompt="$(cat "$2")"; shift 2 ;;
       *) prompt="$1"; shift ;;
     esac
@@ -402,6 +409,7 @@ import json, sys
 out, agent, model, timeout, prompt, bg, adopt, pname, assistant, *flags = sys.argv[1:]
 req = {"agentId": agent, "prompt": prompt, "timeoutMin": float(timeout), "flags": flags}
 if assistant == "1": req["assistant"] = True
+if assistant == "global": req["global"] = True
 if bg == "1": req["background"] = True
 if adopt: req["adopt"] = adopt.split(",")
 if pname: req["name"] = pname
@@ -553,6 +561,14 @@ cmd_snap() {
   ls -d "$run"/snaps/* | tail -1
 }
 
+cmd_restart() {
+  local run i; run="$(current_run)"
+  touch "$run/restart-app"
+  for i in $(seq 1 300); do [ -e "$run/restart-app" ] || break; sleep 1; done
+  [ -e "$run/restart-app" ] && die "the holder did not restart the Shell"
+  grep "restart" "$run/holder.log" | tail -2
+}
+
 cmd_hosts() {
   local run; run="$(current_run)"
   "$PY" -c 'import json,sys
@@ -636,6 +652,7 @@ case "${1:-}" in
   up) shift; cmd_up "$@" ;;
   hosts) shift; cmd_hosts ;;
   snap) shift; cmd_snap ;;
+  restart) shift; cmd_restart ;;
   trial) shift; cmd_trial "$@" ;;
   wait) shift; cmd_wait "$@" ;;
   summary) shift; cmd_summary "$@" ;;
