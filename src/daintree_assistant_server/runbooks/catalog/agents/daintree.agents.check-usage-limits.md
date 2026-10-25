@@ -19,7 +19,7 @@ optionalTools:
   - host.list
   - host.call
 ---
-Asked in prose, a model guesses: read the agent's own usage screen (no turn; it may never stop). A Claude Code pane's warning ("You've used 80% of your weekly limit · resets …") is a reading as of when seen; none proves nothing. A standing watch ("stop at 90%"): re-read before more work goes to that account once a reading is 20 minutes old.
+Asked, a model guesses: read the agent's own usage screen (no turn; it may never stop). A Claude Code pane's warning ("You've used 80% of your weekly limit · resets …") is a reading as of when seen; none proves nothing. A standing watch ("stop at 90%"): re-read before more work goes to that account once a reading is 20 minutes old.
 
 Read-only views (September 2026; revalidate); a command to avoid never skips its CLI.
 
@@ -37,7 +37,7 @@ On a host: the hosts named, else every connected one in `host.list`. With `host.
 {"hostId":"<hostId>","projectId":"<projectId>","tool":"agent.readQuota","args":{}}
 ```
 
-Other CLIs, or Codex's credits: steps 1-2 in any project there (only a built-in command; no project: not checked), then a throwaway run, never a project:
+Other CLIs, or Codex's credits: steps 1-2 in any project there (`local`: your own tools; only a built-in command; no project: not checked), then a throwaway run:
 
 ```json
 {"hostId":"<hostId>","throwaway":true,"tool":"throwaway.launch","args":{"agentId":"<agentId>"},"newCallId":"<uuid>"}
