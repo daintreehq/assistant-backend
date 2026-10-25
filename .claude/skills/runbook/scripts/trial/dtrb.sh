@@ -32,7 +32,8 @@
 #         its own assistant (help-core/-full: host.list, host.call); --on HOST a Remote
 #         Host's own MCP with its API key (to check what a host.call did there)
 #   dtrb.sh hosts                  the run's Remote Hosts (name, hostId, projectId, ...)
-#   dtrb.sh snap                   screenshot + terminal dump of the Shell and every host window
+#   dtrb.sh snap                   screenshot + terminal dump of the Shell and every host window,
+#                                  and the global Assistant's screen (global.txt)
 #   dtrb.sh project                print the running trial project's path
 #   dtrb.sh status | down          show state | close the app and stop the holder
 #   dtrb.sh purge [run-name]       delete stopped runs and their scratch projects
@@ -155,7 +156,9 @@ cmd_runbooks() {
       # task). A nohup'd server started from an agent's shell call was reaped when that
       # session's process group was cleaned up. Real env beats .env in
       # pydantic-settings, so PORT here wins over the repo's .env.
+      # exec keeps this pid, so stop can find a served server too.
       resolve_backend_python
+      echo $$ >"$pidf"
       cd "$BACKEND" && PORT="$RUNBOOKS_PORT" HOST=127.0.0.1 DAINTREE_LOG_CONSOLE=1 \
         exec "$PY_BACKEND" -m daintree_assistant_server ;;
     start)
@@ -175,7 +178,16 @@ cmd_runbooks() {
       ;;
     stop)
       [ -f "$pidf" ] && kill "$(cat "$pidf")" 2>/dev/null || true
-      rm -f "$pidf"; say "runbook server stopped" ;;
+      rm -f "$pidf"
+      # A server this kit did not start (or lost the pid of) keeps the port: say so,
+      # or the next start silently talks to the old checkout.
+      local i holder
+      for i in $(seq 1 15); do
+        lsof -nP -iTCP:"$RUNBOOKS_PORT" -sTCP:LISTEN >/dev/null 2>&1 || { say "runbook server stopped"; return 0; }
+        sleep 1
+      done
+      holder="$(lsof -nP -t -iTCP:"$RUNBOOKS_PORT" -sTCP:LISTEN 2>/dev/null | head -1)"
+      die "port $RUNBOOKS_PORT is still served (pid ${holder:-?}); stop that process before starting another" ;;
     status)
       curl -fsS "http://127.0.0.1:$RUNBOOKS_PORT/readyz" && echo || say "not serving on $RUNBOOKS_PORT" ;;
   esac
