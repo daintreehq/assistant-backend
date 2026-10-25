@@ -403,7 +403,7 @@ def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
         )
         checks.failures.extend(f"docs.{f}" for f in docs_checks.failures)
 
-    checks.exactly_zero("candidate_miss_trials")
+    checks.exactly_zero("candidate_miss_runbooks")
 
     # Every missing runbook must be attributed to exactly one stage. Without this
     # the histogram can quietly under-count — which it did: a background-wake
@@ -411,12 +411,18 @@ def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
     # summed to one less than the miss count with nothing to say so. A
     # decomposition that does not add up is worse than no decomposition, because
     # the missing row is invisible while the ones present look complete.
+    #
+    # The histogram counts RUNBOOKS, so it reconciles against `missing_runbooks`,
+    # never against `recall_miss_trials`: a trial that loses two runbooks is one
+    # failed trial and two losses. The per-(case, runbook) list catches what a
+    # total cannot — an omission in one case offset by a duplicate in another.
     stages = summary.get("stages")
-    misses = checks.value("recall_miss_trials")
+    misses = checks.value("missing_runbooks")
+    unreconciled = summary.get("unreconciled_losses")
     if not isinstance(stages, Mapping):
         checks.note("summary.stages is missing — losses were not attributed")
     elif misses is None:
-        checks.note("recall_miss_trials is missing — losses cannot be reconciled")
+        checks.note("missing_runbooks is missing — losses cannot be reconciled")
     else:
         attributed = sum(v for v in stages.values() if isinstance(v, int))
         if attributed != misses:
@@ -424,6 +430,15 @@ def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
                 f"stages sum to {attributed} but {misses:g} required runbooks were "
                 f"missed — the loss attribution does not account for every miss"
             )
+    if not isinstance(unreconciled, list):
+        checks.note("summary.unreconciled_losses is missing — losses were not reconciled")
+    elif unreconciled:
+        shown = "; ".join(str(u) for u in unreconciled[:5])
+        more = f" (+{len(unreconciled) - 5} more)" if len(unreconciled) > 5 else ""
+        checks.note(
+            f"{len(unreconciled)} missing runbooks do not map to exactly one declared "
+            f"stage: {shown}{more}"
+        )
 
     spans = summary.get("spans_ms")
     if not isinstance(spans, Mapping) or not isinstance(spans.get("total_ms"), Mapping):
