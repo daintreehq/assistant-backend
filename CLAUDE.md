@@ -221,9 +221,7 @@ cheap, a few dollars on a rented Lambda GPU (about two hours on an A10), but **o
 starts one**: they merge a batch of runbook work, then retrain once on `develop`. Never retrain
 on a branch or inside a skill run, even to turn a red gate green; name it as owed
 (`/retrain-selector <ids>`) in the PR and the report, with the cases it should win back. Retrains swing
-several cases by seed, so judge a recipe over several seeds. `TODO.md` carries the
-retrain-triggered entries (reservation retention, renamed routing text, `k=64` at ~200
-runbooks, domain foundations).
+several cases by seed, so judge a recipe over several seeds.
 
 **The model is not in Git.** The ONNX graphs, tokenizer vocabularies and `vectors.npz` live in a
 maintainer-controlled bucket (named in `selector.lock`), one object per distinct content, named by

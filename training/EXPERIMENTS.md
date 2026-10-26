@@ -1030,7 +1030,7 @@ whose scores are calibrated first — measure expected calibration error or a Br
 score on held-out cases, not on this corpus, which the head has effectively seen.
 The cheaper alternative is to stop asking the classifier: a discrete
 `clear | ambiguous | insufficient` output trained as its own target would at least
-be fitted to the question being asked of it. `TODO.md` carries the trigger.
+be fitted to the question being asked of it.
 
 Reproduce: `benchmarks/runbook_selection/local_runner.py` drives the same artifact;
 the distribution above comes from `SetwiseClassifier.select(...).scores` for the

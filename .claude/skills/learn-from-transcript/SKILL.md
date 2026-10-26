@@ -248,7 +248,7 @@ failure. Read both columns. After writing, re-run Phase 2's `bench search` lines
 
 A new runbook owes a recall case, plus a routing trap for each neighbour its
 `whenToUse` names. `bench coverage` enforces the recall case but only one trap
-excluding any one neighbour (`TODO.md`, "Gate routing traps per EDGE"), so the
+excluding any one neighbour (it gates per runbook, not per edge), so the
 rest are on you. A case the shipped artifact fails is allowed, and is honest
 measurement, as long as the gate stays green and `candidate_miss` stays zero.
 

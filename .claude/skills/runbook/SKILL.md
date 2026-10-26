@@ -345,8 +345,8 @@ the app would need.
 **E. External facts**, if the procedure depends on a third-party CLI or service: one
 bundled Google query naming versions and every sub-question.
 
-**F. Prior lessons**: `grep -En "<neighbour id>|<namespace>" training/EXPERIMENTS.md
-TODO.md`, and the notes on cases that name the neighbours.
+**F. Prior lessons**: `grep -En "<neighbour id>|<namespace>" training/EXPERIMENTS.md`,
+and the notes on cases that name the neighbours.
 
 **Research output**: the research trace (what ran, what each step contributed), the
 starting position with the sweep evidence, the neighbours, grounding verdicts, and
