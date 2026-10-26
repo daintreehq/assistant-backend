@@ -119,7 +119,7 @@ curl -fsS https://assistant.daintree.org/version              # build_sha
 ```
 
 The same SHA in both means nothing is in flight. If they differ and that push was
-under 35 minutes ago, its build may still be running: watch it with
+under 65 minutes ago, its build may still be running: watch it with
 `watch-live.sh <sha> <pushed-at>` (step 5) and only then continue. If they differ
 and the push is older, its build is over and never went live. Tell the user, since
 this release ships that commit again, then continue.
@@ -256,7 +256,7 @@ It polls the public `/version` every 20s and prints only changes:
 - `SERVING <sha>`: what is live now (`unreachable` if `/version` does not answer).
   The first line is the old commit, and that is expected while the build runs.
 - `LIVE <sha>`: the release is serving. Exits 0.
-- `DEADLINE ...`: 35 minutes after the push, the commit is still not live. Exits 1.
+- `DEADLINE ...`: 65 minutes after the push (the build's 60-minute limit plus slack), the commit is still not live. Exits 1.
 
 Its deadline counts from the push, so a Monitor expiry before `LIVE` or
 `DEADLINE` is not a verdict. Re-arm it with the same arguments. `DEADLINE` means
