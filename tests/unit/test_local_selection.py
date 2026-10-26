@@ -241,46 +241,48 @@ def _artifact_present() -> bool:
     )
 
 
-def _live_selector():  # type: ignore[no-untyped-def]
+def _live_selector(artifact: Path):  # type: ignore[no-untyped-def]
     from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
     catalog = load_catalog(default_runbooks_dir())
-    clf = SetwiseClassifier(_ARTIFACT)
+    clf = SetwiseClassifier(artifact)
     clf.sync(catalog)
     return clf, catalog
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_shipped_classifier_selects_a_plausible_runbook() -> None:
-    clf, _ = _live_selector()
+def test_shipped_classifier_selects_a_plausible_runbook(shipped_selector_dir: Path) -> None:
+    clf, _ = _live_selector(shipped_selector_dir)
     sel = clf.select("rename my terminals so i can tell the agents apart", [])
     assert "daintree.terminals.rename" in sel.runbook_ids
     assert 0 < sel.cardinality <= 3
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_shipped_classifier_returns_empty_on_chatter() -> None:
-    clf, _ = _live_selector()
+def test_shipped_classifier_returns_empty_on_chatter(shipped_selector_dir: Path) -> None:
+    clf, _ = _live_selector(shipped_selector_dir)
     assert clf.select("thanks, that's perfect", []).runbook_ids == []
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_shipped_table_covers_exactly_the_selectable_catalog() -> None:
+def test_shipped_table_covers_exactly_the_selectable_catalog(shipped_selector_dir: Path) -> None:
     """The table is built FROM the live catalog, so it can only ever match it.
 
     Asserted anyway because the ids in it are what the selector may return, and
     a table built from a stale ``vectors.npz`` that ``sync`` failed to reconcile
     would offer runbooks the catalog cannot load.
     """
-    clf, catalog = _live_selector()
+    clf, catalog = _live_selector(shipped_selector_dir)
     table = clf.table
     assert table is not None
     assert set(table.ids) == set(catalog.selectable_ids)
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_a_runbook_added_after_training_is_routable_without_retraining() -> None:
+def test_a_runbook_added_after_training_is_routable_without_retraining(
+    shipped_selector_dir: Path,
+) -> None:
     """The property the whole two-stage design exists for.
 
     A runbook the artifact has never seen — no weight row, no training row, not in
@@ -300,7 +302,7 @@ def test_a_runbook_added_after_training_is_routable_without_retraining() -> None
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
     catalog = load_catalog(default_runbooks_dir())
-    clf = SetwiseClassifier(_ARTIFACT)
+    clf = SetwiseClassifier(shipped_selector_dir)
     before = clf.sync(catalog)
     invented = "daintree.secrets.rotate-credentials"
     assert invented not in before.ids
@@ -381,9 +383,9 @@ class _CatalogPlusOne:
         ),
     ],
 )
-def test_shipped_classifier_routes_each_new_mcp_runbook(query: str, expected: str) -> None:
+def test_shipped_classifier_routes_each_new_mcp_runbook(query: str, expected: str, shipped_selector_dir: Path) -> None:
     """Every shipped runbook must be reachable from a representative request."""
-    clf, _ = _live_selector()
+    clf, _ = _live_selector(shipped_selector_dir)
     assert expected in clf.select(query, []).runbook_ids
 
 
@@ -405,9 +407,9 @@ def test_shipped_classifier_routes_each_new_mcp_runbook(query: str, expected: st
         ),
     ],
 )
-def test_shipped_classifier_respects_new_runbook_boundaries(query: str, excluded: str) -> None:
+def test_shipped_classifier_respects_new_runbook_boundaries(query: str, excluded: str, shipped_selector_dir: Path) -> None:
     """Broad MCP runbooks must not displace their common read-only/local neighbours."""
-    clf, _ = _live_selector()
+    clf, _ = _live_selector(shipped_selector_dir)
     assert excluded not in clf.select(query, []).runbook_ids
 
 
@@ -494,7 +496,7 @@ def test_pool_rejects_when_every_admission_slot_is_taken() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
+def test_a_usage_question_retrieves_docs_even_mid_conversation(shipped_selector_dir: Path) -> None:
     """THE regression. The shape of session ses_aa9b63b4 turn 2.
 
     A usage question asked after a loaded runbook and a prior exchange. Before the
@@ -512,7 +514,7 @@ def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
     """
     from daintree_assistant_server.runbooks.local.documents import query_document
 
-    clf, catalog = _live_selector()
+    clf, catalog = _live_selector(shipped_selector_dir)
     convo = [
         _Msg("user", "Which MCP endpoint are you connected to?"),
         _Msg("assistant", "The Daintree MCP endpoint: http://127.0.0.1:45454/mcp."),
@@ -534,9 +536,9 @@ def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_conversation_context_no_longer_suppresses_documentation() -> None:
+def test_conversation_context_no_longer_suppresses_documentation(shipped_selector_dir: Path) -> None:
     """Recall must not depend on how far into a conversation the question lands."""
-    clf, catalog = _live_selector()
+    clf, catalog = _live_selector(shipped_selector_dir)
     questions = [
         "what is a watcher",
         "how do I create a worktree",
@@ -567,21 +569,21 @@ def test_conversation_context_no_longer_suppresses_documentation() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_chatter_still_does_not_retrieve_documentation() -> None:
+def test_chatter_still_does_not_retrieve_documentation(shipped_selector_dir: Path) -> None:
     """The threshold sits below 0.5; the no-task side must not have moved.
 
     Measured at 0 false positives on 169 chatter/no-task corpus queries for every
     threshold down to 0.15, so this is the cheap standing guard on that.
     """
-    clf, catalog = _live_selector()
+    clf, catalog = _live_selector(shipped_selector_dir)
     for q in ("thanks, that's perfect", "ok cool", "close all the terminals"):
         assert not clf.select(q, [], catalog=catalog, docs_query=q).docs_wanted, q
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_the_docs_pass_does_not_disturb_runbook_selection() -> None:
+def test_the_docs_pass_does_not_disturb_runbook_selection(shipped_selector_dir: Path) -> None:
     """Only the docs logit is re-read; the ranking answer must be untouched."""
-    clf, catalog = _live_selector()
+    clf, catalog = _live_selector(shipped_selector_dir)
     q = "rename my terminals so i can tell the agents apart"
     without = clf.select(q, [], catalog=catalog, docs_query=None)
     with_docs = clf.select(q, [], catalog=catalog, docs_query="what is a watcher")
@@ -590,14 +592,14 @@ def test_the_docs_pass_does_not_disturb_runbook_selection() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_the_second_pass_is_skipped_when_the_strings_already_agree() -> None:
+def test_the_second_pass_is_skipped_when_the_strings_already_agree(shipped_selector_dir: Path) -> None:
     """A cold opening turn pays nothing — asserted by COUNTING the work.
 
     Comparing outputs would not do it: an implementation that always ran the
     second pass would return the same answer and pass. So count head runs, which
     is the cost the skip exists to avoid.
     """
-    clf, catalog = _live_selector()
+    clf, catalog = _live_selector(shipped_selector_dir)
     q = "what is a watcher"
     runs: list[int] = []
     real_run = clf._head.run
@@ -629,9 +631,9 @@ class _Counting:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_an_empty_docs_query_behaves_like_no_docs_query() -> None:
+def test_an_empty_docs_query_behaves_like_no_docs_query(shipped_selector_dir: Path) -> None:
     """"" is not a question. It must not be embedded and rated as one."""
-    clf, catalog = _live_selector()
+    clf, catalog = _live_selector(shipped_selector_dir)
     q = "rename my terminals"
     assert (
         clf.select(q, [], catalog=catalog, docs_query="").docs_wanted
@@ -645,7 +647,7 @@ def test_an_empty_docs_query_behaves_like_no_docs_query() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_an_active_runbook_reaches_the_head_even_when_retrieval_ranks_it_last() -> None:
+def test_an_active_runbook_reaches_the_head_even_when_retrieval_ranks_it_last(shipped_selector_dir: Path) -> None:
     """The reservation guarantee, measured against the real retriever.
 
     The evidence used here is a genuine turn, not a synthetic similarity row:
@@ -658,7 +660,7 @@ def test_an_active_runbook_reaches_the_head_even_when_retrieval_ranks_it_last() 
     84% of the catalog is on the ballot regardless — which is exactly why it
     needs pinning before the catalog grows into the regime where it bites.
     """
-    clf, _ = _live_selector()
+    clf, _ = _live_selector(shipped_selector_dir)
     active = {
         "daintree.terminals.rename",
         "daintree.foundation",
@@ -728,7 +730,7 @@ def _table_hiding(clf: Any, runbook_id: str, text: str):  # type: ignore[no-unty
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None:
+def test_a_reserved_candidate_reaches_the_head_with_the_right_features(shipped_selector_dir: Path) -> None:
     """The tensor the head is actually fed, on a turn that really did reserve.
 
     Everything else here checks the assembler in isolation or the classifier on
@@ -740,7 +742,7 @@ def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None
     from daintree_assistant_server.runbooks.local.documents import ACTIVE_PREFIX
     from daintree_assistant_server.runbooks.local.setwise import FEATURE_NAMES
 
-    clf, _ = _live_selector()
+    clf, _ = _live_selector(shipped_selector_dir)
     active = "daintree.terminals.rename"
     text = ACTIVE_PREFIX.format(active) + "how is that going?"
     table = _table_hiding(clf, active, text)
@@ -766,7 +768,7 @@ def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
+def test_a_reserved_candidate_is_scored_rather_than_absent(shipped_selector_dir: Path) -> None:
     """The promise reservation makes, end to end: a hearing.
 
     The head returns a probability for the unreachable active runbook instead of
@@ -778,7 +780,7 @@ def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
     """
     from daintree_assistant_server.runbooks.local.documents import ACTIVE_PREFIX
 
-    clf, _ = _live_selector()
+    clf, _ = _live_selector(shipped_selector_dir)
     active = "daintree.terminals.rename"
     query = "how is that going?"
     table = _table_hiding(clf, active, ACTIVE_PREFIX.format(active) + query)
@@ -798,13 +800,13 @@ def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_a_topic_shift_evicts_the_prior_runbook() -> None:
+def test_a_topic_shift_evicts_the_prior_runbook(shipped_selector_dir: Path) -> None:
     """The same rule on the UNMODIFIED catalog, where retrieval works normally.
 
     Not a reservation test — here the rename runbook is retrieved on its own merits
     — but the eviction it checks is the property reservation must not break.
     """
-    clf, _ = _live_selector()
+    clf, _ = _live_selector(shipped_selector_dir)
     sel = clf.select(
         "forget that — I need to create a git worktree for the new feature branch",
         ["daintree.terminals.rename"],
@@ -813,7 +815,7 @@ def test_a_topic_shift_evicts_the_prior_runbook() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_reservation_stays_dormant_on_ordinary_follow_ups_today() -> None:
+def test_reservation_stays_dormant_on_ordinary_follow_ups_today(shipped_selector_dir: Path) -> None:
     """At 38 runbooks the change is inert in practice, and that is worth pinning.
 
     Not because 38 < 32 — it is not, and six runbooks genuinely do sit off every
@@ -826,7 +828,7 @@ def test_reservation_stays_dormant_on_ordinary_follow_ups_today() -> None:
     reserving on everyday turns surfaces here, where it is attributable, rather
     than as unexplained benchmark drift.
     """
-    clf, _ = _live_selector()
+    clf, _ = _live_selector(shipped_selector_dir)
     active = ["daintree.terminals.rename"]
     for query in (
         "how is that going?",
@@ -843,7 +845,7 @@ def test_reservation_stays_dormant_on_ordinary_follow_ups_today() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
-def test_a_pinned_nonselectable_runbook_is_never_seated_as_a_candidate() -> None:
+def test_a_pinned_nonselectable_runbook_is_never_seated_as_a_candidate(shipped_selector_dir: Path) -> None:
     """The docs runbook is server-pinned and hidden from selection.
 
     It legitimately appears in a prior active set, so the reservation path has
@@ -853,7 +855,7 @@ def test_a_pinned_nonselectable_runbook_is_never_seated_as_a_candidate() -> None
     """
     from daintree_assistant_server.runbooks.catalog import DOCS_RUNBOOK_ID
 
-    clf, catalog = _live_selector()
+    clf, catalog = _live_selector(shipped_selector_dir)
     assert DOCS_RUNBOOK_ID not in catalog.selectable_ids
 
     table = clf.table
@@ -953,7 +955,7 @@ def test_a_rejected_job_never_counts_as_a_queue_wait() -> None:
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)")
 def test_cache_with_wrong_precision_encoder_or_runtime_is_not_adopted(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, shipped_selector_dir: Path
 ) -> None:
     from dataclasses import replace
 
@@ -961,7 +963,7 @@ def test_cache_with_wrong_precision_encoder_or_runtime_is_not_adopted(
     from daintree_assistant_server.runbooks.local import setwise
     from daintree_assistant_server.runbooks.local.setwise import save_table
 
-    classifier = SetwiseClassifier(_ARTIFACT)
+    classifier = SetwiseClassifier(shipped_selector_dir)
     fresh = classifier.sync(load_catalog())
     for part in _ARTIFACT.iterdir():
         if part.name != "vectors.npz":

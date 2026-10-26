@@ -221,13 +221,13 @@ def test_a_case_may_not_expect_what_its_state_leaves_out(catalog: Catalog) -> No
     not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
 )
 def test_excluded_runbooks_free_their_shortlist_slots_for_eligible_ones(
-    catalog: Catalog,
+    catalog: Catalog, shipped_selector_dir: Path
 ) -> None:
     """Filtering after the head would leave the ballot short by every excluded
     runbook retrieval ranked; excluding before it fills all ``k`` slots."""
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    clf = SetwiseClassifier(_ARTIFACT)
+    clf = SetwiseClassifier(shipped_selector_dir)
     clf.sync(catalog)
     query = "Work these six issues in parallel, an agent on each"
     exclude = catalog.excluded_for(HostState("none"))
@@ -248,10 +248,12 @@ def test_excluded_runbooks_free_their_shortlist_slots_for_eligible_ones(
 @pytest.mark.skipif(
     not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
 )
-def test_an_excluded_active_runbook_is_neither_reserved_nor_kept(catalog: Catalog) -> None:
+def test_an_excluded_active_runbook_is_neither_reserved_nor_kept(
+    catalog: Catalog, shipped_selector_dir: Path
+) -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    clf = SetwiseClassifier(_ARTIFACT)
+    clf = SetwiseClassifier(shipped_selector_dir)
     clf.sync(catalog)
     active = "daintree.hosts.swarm-fan-out"
     exclude = catalog.excluded_for(HostState("none"))
@@ -264,10 +266,12 @@ def test_an_excluded_active_runbook_is_neither_reserved_nor_kept(catalog: Catalo
 @pytest.mark.skipif(
     not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
 )
-def test_excluding_the_whole_table_is_an_empty_selection(catalog: Catalog) -> None:
+def test_excluding_the_whole_table_is_an_empty_selection(
+    catalog: Catalog, shipped_selector_dir: Path
+) -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    clf = SetwiseClassifier(_ARTIFACT)
+    clf = SetwiseClassifier(shipped_selector_dir)
     clf.sync(catalog)
     sel = clf.select("rename my terminals", [], catalog=catalog, exclude=catalog.selectable_ids)
     assert sel.runbook_ids == [] and sel.ranked == ()
@@ -277,11 +281,11 @@ def test_excluding_the_whole_table_is_an_empty_selection(catalog: Catalog) -> No
     not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
 )
 def test_the_docs_pass_builds_its_own_ballot_under_the_same_exclusion(
-    catalog: Catalog,
+    catalog: Catalog, shipped_selector_dir: Path
 ) -> None:
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    clf = SetwiseClassifier(_ARTIFACT)
+    clf = SetwiseClassifier(shipped_selector_dir)
     clf.sync(catalog)
     exclude = catalog.excluded_for(HostState("none"))
     seen: list[frozenset[str]] = []

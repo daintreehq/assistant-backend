@@ -141,12 +141,12 @@ def test_the_scripted_seam_matches_the_search_signature() -> None:
 @pytest.mark.skipif(
     not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
 )
-def test_shipped_search_finds_the_obvious_runbook() -> None:
+def test_shipped_search_finds_the_obvious_runbook(shipped_selector_dir: Path) -> None:
     from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
     catalog = load_catalog(default_runbooks_dir())
-    clf = SetwiseClassifier(_ARTIFACT)
+    clf = SetwiseClassifier(shipped_selector_dir)
     # Embedding runbooks the artifact has not seen is a one-time startup cost (the app's
     # lifespan syncs before serving), not part of a search: keep it outside the timed call.
     clf.sync(catalog)
@@ -172,14 +172,16 @@ def test_shipped_search_finds_the_obvious_runbook() -> None:
 @pytest.mark.skipif(
     not _artifact_present(), reason="selector model not fetched (training/fetch_selector.sh)"
 )
-def test_shipped_search_offers_host_runbooks_only_where_the_state_fits() -> None:
+def test_shipped_search_offers_host_runbooks_only_where_the_state_fits(
+    shipped_selector_dir: Path,
+) -> None:
     """Host eligibility is applied before the current catalog is ranked."""
     from daintree_assistant_server.runbooks.catalog import load_catalog
     from daintree_assistant_server.runbooks.host_state import HostState
     from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
     catalog = load_catalog()
-    clf = SetwiseClassifier(_ARTIFACT)
+    clf = SetwiseClassifier(shipped_selector_dir)
     clf.sync(catalog)
     fan_out = "Work these six issues in parallel, an agent on each"
 

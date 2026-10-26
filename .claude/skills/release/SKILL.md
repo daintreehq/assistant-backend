@@ -230,8 +230,7 @@ overlapping builds, which is exactly the risk preflight guards against.
 **If it ends in anything but `SUCCESS`:**
 
 ```bash
-gcloud builds log <id> --region="$BUILD_REGION" --project="$PROJECT" \
-  --stream=false > /tmp/release-build.log
+gcloud builds log <id> --region="$BUILD_REGION" --project="$PROJECT" > /tmp/release-build.log
 tail -80 /tmp/release-build.log
 ```
 

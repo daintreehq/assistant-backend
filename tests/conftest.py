@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -44,3 +45,27 @@ def app(settings: Settings, catalog: Catalog) -> Any:
 def client(app: Any) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture(scope="session")
+def shipped_selector_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The shipped selector, with its table already synced to the current catalog.
+
+    The shipped ``vectors.npz`` predates the encoder fingerprint, so no classifier
+    adopts it, and each new one embeds the whole catalog, one document at a time, on
+    its first ``sync``: about 20s, paid again by every test that built its own. This
+    embeds it once per session and saves the table, fingerprinted, beside symlinks to
+    the rest of the artifact, so a classifier built here is still fresh but adopts
+    the table and syncs on the fast path. Tests whose subject is embedding itself
+    keep the real artifact directory.
+    """
+    from daintree_assistant_server.runbooks.local.paths_local import selector_artifact_dir
+    from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier, save_table
+
+    shipped = selector_artifact_dir()
+    synced = tmp_path_factory.mktemp("selector")
+    for part in shipped.iterdir():
+        if part.name != "vectors.npz":
+            (synced / part.name).symlink_to(part)
+    save_table(synced / "vectors.npz", SetwiseClassifier(shipped).sync(load_catalog()))
+    return synced
