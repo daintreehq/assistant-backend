@@ -343,6 +343,22 @@ def _category_floor(
             )
 
 
+#: Forbidden loads the shipped model is known to make, each owed to a retrain, by case
+#: and the exact runbooks it loads. The gate fails on any other forbidden load, so this
+#: is a ratchet at the current model, not a tolerance: an entry comes out with the
+#: retrain that wins its case back, and a new runbook cannot add one silently.
+#: These three predate their host runbooks' training (model 98728e4c, trained
+#: 2026-10-18; place-work 10-21, drain-issue-backlog 10-23), and three rewordings of
+#: drain-issue-backlog's routing text each scored net 0 over every case (75b937b6).
+#: Owed: /retrain-selector daintree.hosts.drain-issue-backlog daintree.hosts.place-work
+#: daintree.agents.choose-agent-model
+KNOWN_FORBIDDEN_LOADS: Mapping[str, frozenset[str]] = {
+    "tx-host-batch-rounds-agent-query": frozenset({"daintree.hosts.drain-issue-backlog"}),
+    "tx-host-all-issues-user-words": frozenset({"daintree.hosts.drain-issue-backlog"}),
+    "tx-model-split-across-named-hosts": frozenset({"daintree.hosts.place-work"}),
+}
+
+
 def _forbidden_load_checks(checks: _Checks, doc: Mapping[str, Any]) -> None:
     """No case may load a runbook it forbids, whatever the aggregate rates say.
 
@@ -350,11 +366,14 @@ def _forbidden_load_checks(checks: _Checks, doc: Mapping[str, Any]) -> None:
     rate, so a named wrong-workflow boundary could regress while the rate stayed
     above its floor. An exclusion is a different contract from a tolerated extra:
     the forbidden runbook is delivered in full to a caller that must not follow
-    it. So the count is gated at zero, and reconciled against the per-case list
-    it summarises, which is what names the cases when it is not.
+    it. So every forbidden load fails the run unless ``KNOWN_FORBIDDEN_LOADS``
+    names that case and that runbook; an entry whose case ran and no longer fails
+    fails it too, so the list only shrinks. The count is reconciled against the
+    per-case list it summarises, which is what names the cases.
     """
-    checks.exactly_zero("forbidden_cases")
     count = checks.value("forbidden_cases")
+    if count is None:
+        checks.exactly_zero("forbidden_cases")  # records the missing or malformed count
     per_case = doc.get("forbidden")
     case_ids = doc.get("case_ids")
     if not isinstance(per_case, list) or not isinstance(case_ids, list):
@@ -372,9 +391,25 @@ def _forbidden_load_checks(checks: _Checks, doc: Mapping[str, Any]) -> None:
             f"forbidden_cases={count:g} but {len(wrong)} cases list a forbidden load — "
             f"the count does not match the cases"
         )
-    for cid, ids in wrong:
+    unknown = [
+        (cid, ids)
+        for cid, ids in wrong
+        if not (
+            isinstance(ids, list) and set(ids) <= KNOWN_FORBIDDEN_LOADS.get(str(cid), frozenset())
+        )
+    ]
+    if unknown:
+        checks.note(
+            f"forbidden_cases={len(wrong)}, {len(unknown)} not in KNOWN_FORBIDDEN_LOADS, expected 0"
+        )
+    for cid, ids in unknown:
         loaded = ", ".join(ids) if isinstance(ids, list) else repr(ids)
         checks.note(f"forbidden load: {cid} selected {loaded}")
+    failing = {str(cid) for cid, _ in wrong}
+    for cid in sorted(set(KNOWN_FORBIDDEN_LOADS) & {str(c) for c in case_ids} - failing):
+        checks.note(
+            f"{cid} no longer loads a forbidden runbook: remove it from KNOWN_FORBIDDEN_LOADS"
+        )
 
 
 def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:

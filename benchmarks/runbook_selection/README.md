@@ -56,9 +56,12 @@ behaviour here and a defect there. The strict rate is reported and gated too,
 well below the measurement, so a precision collapse still reddens the suite.
 
 An extra the case **forbids** (`expect.forbid`, or the wrong end of a hub/lane pair) is
-not a tolerated extra: `local` fails on any one of them (`forbidden_cases`, gated at
-zero and naming each case), whatever the rates say. Optional neighbours and unlisted
-extras keep the contract above.
+not a tolerated extra: `local` fails on any one of them (`forbidden_cases`, naming each
+case), whatever the rates say. The one exception is `KNOWN_FORBIDDEN_LOADS` in
+`quality.py`: a case and the exact runbook the shipped model is known to load, each owed
+to a named retrain. It only shrinks: an entry whose case passes fails the run until it is
+removed, and nothing outside it is exempt. Optional neighbours and unlisted extras keep
+the contract above.
 
 ## Quick start
 

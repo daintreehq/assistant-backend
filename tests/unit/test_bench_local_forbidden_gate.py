@@ -12,10 +12,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from benchmarks.runbook_selection.cases import BenchCase
+import pytest
+
+from benchmarks.runbook_selection import quality
+from benchmarks.runbook_selection.cases import BenchCase, load_cases
 from benchmarks.runbook_selection.local_runner import build_local_doc
 from benchmarks.runbook_selection.quality import runbook_selection_local_verdict
 from benchmarks.runbook_selection.scoring import score_trial
+from daintree_assistant_server.runbooks.catalog import load_catalog
 
 
 def _case(cid: str, *, forbid: tuple[str, ...] = (), docs: bool | None = None) -> BenchCase:
@@ -68,9 +72,53 @@ def test_one_forbidden_load_fails_a_run_whose_rates_all_pass() -> None:
     assert doc["summary"]["recall_pass_cases"] == 19  # 0.95, above its floor
     verdict = runbook_selection_local_verdict(doc)
     assert verdict.failures == (
-        "forbidden_cases=1, expected 0",
+        "forbidden_cases=1, 1 not in KNOWN_FORBIDDEN_LOADS, expected 0",
         "forbidden load: c3 selected daintree.wrong",
     )
+
+
+def test_a_known_forbidden_load_passes_and_any_other_still_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The known list exempts that case loading that runbook, and nothing wider."""
+    monkeypatch.setattr(quality, "KNOWN_FORBIDDEN_LOADS", {"c3": frozenset({"daintree.wrong"})})
+    forbid = {"c3": ("daintree.wrong", "daintree.worse"), "c4": ("daintree.wrong",)}
+    assert runbook_selection_local_verdict(_doc({"c3": ["daintree.wrong"]}, forbid)).passed
+
+    other_runbook = _doc({"c3": ["daintree.worse"]}, forbid)
+    assert runbook_selection_local_verdict(other_runbook).failures == (
+        "forbidden_cases=1, 1 not in KNOWN_FORBIDDEN_LOADS, expected 0",
+        "forbidden load: c3 selected daintree.worse",
+    )
+
+    other_case = _doc({"c3": ["daintree.wrong"], "c4": ["daintree.wrong"]}, forbid)
+    assert runbook_selection_local_verdict(other_case).failures == (
+        "forbidden_cases=2, 1 not in KNOWN_FORBIDDEN_LOADS, expected 0",
+        "forbidden load: c4 selected daintree.wrong",
+    )
+
+
+def test_a_known_entry_whose_case_passes_fails_until_removed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The list only shrinks: a case won back must leave it, or it exempts a regression."""
+    monkeypatch.setattr(
+        quality,
+        "KNOWN_FORBIDDEN_LOADS",
+        {"c3": frozenset({"daintree.wrong"}), "not-in-this-run": frozenset({"daintree.x"})},
+    )
+    verdict = runbook_selection_local_verdict(_doc({}, {"c3": ("daintree.wrong",)}))
+    assert verdict.failures == (
+        "c3 no longer loads a forbidden runbook: remove it from KNOWN_FORBIDDEN_LOADS",
+    )
+
+
+def test_every_known_forbidden_load_names_a_real_case_and_its_forbidden_runbook() -> None:
+    """An entry for a renamed case, or a runbook the case does not forbid, exempts nothing."""
+    cases = {c.id: c for c in load_cases(load_catalog())}
+    for cid, runbooks in quality.KNOWN_FORBIDDEN_LOADS.items():
+        assert cid in cases, f"{cid} is not a benchmark case"
+        assert runbooks <= set(cases[cid].forbid), f"{cid} does not forbid {sorted(runbooks)}"
 
 
 def test_an_allowed_or_unforbidden_extra_keeps_its_current_contract() -> None:
